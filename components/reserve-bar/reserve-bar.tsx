@@ -29,7 +29,13 @@ import { cn } from "@/lib/utils";
 const HELPER_TEXT =
   "Select a bench and continuous blocks of time up to 1 year to reserve a bench.";
 
-export function ReserveBar({ isLoggedIn }: { isLoggedIn: boolean }) {
+export function ReserveBar({
+  isLoggedIn,
+  hasActiveReservation = false,
+}: {
+  isLoggedIn: boolean;
+  hasActiveReservation?: boolean;
+}) {
   const store = useReservationApi();
   const router = useRouter();
   const { open: openAuth } = useAuthModal();
@@ -44,7 +50,7 @@ export function ReserveBar({ isLoggedIn }: { isLoggedIn: boolean }) {
   const [done, setDone] = React.useState(false);
 
   const state = store.getState();
-  const enabled = reserveEnabled(state);
+  const enabled = reserveEnabled(state) && !hasActiveReservation;
   const bench = state.benches.find((b) => b.id === state.selectedBenchId) ?? null;
 
   function startReserve() {

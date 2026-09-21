@@ -26,6 +26,21 @@ export async function createReservationAction(input: {
   }
 
   const supabase = await createClient();
+
+  if (!user.isAdmin) {
+    const { count } = await supabase
+      .from("reservations")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "active");
+    if ((count ?? 0) >= 1) {
+      return {
+        ok: false,
+        error:
+          "You can only reserve one bench at a time. Cancel your current reservation to reserve a different bench.",
+      };
+    }
+  }
   const { data, error } = await supabase.rpc("create_reservation", {
     p_user_id: user.id,
     p_bench_id: input.benchId,

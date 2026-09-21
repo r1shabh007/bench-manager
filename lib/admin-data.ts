@@ -44,7 +44,7 @@ export async function getAllReservations(): Promise<AdminReservationRow[]> {
   const { data } = await supabase
     .from("reservations")
     .select(
-      "id, bench_id, user_id, start_month, end_month, status, created_at, cancelled_at, benches(code, region, description), profiles(username, email)",
+      "id, bench_id, user_id, start_month, end_month, status, created_at, cancelled_at, benches(code, region, description), profiles!user_id(username, email)",
     )
     .order("created_at", { ascending: false });
 

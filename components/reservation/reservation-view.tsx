@@ -11,7 +11,13 @@ import { ReserveBar } from "@/components/reserve-bar/reserve-bar";
 import { useReservationStore } from "@/components/reservation/reservation-provider";
 import { currentYearNY } from "@/lib/months";
 
-export function ReservationView({ isLoggedIn }: { isLoggedIn: boolean }) {
+export function ReservationView({
+  isLoggedIn,
+  hasActiveReservation = false,
+}: {
+  isLoggedIn: boolean;
+  hasActiveReservation?: boolean;
+}) {
   const view = useReservationStore((s) => s.view);
   const year = currentYearNY();
 
@@ -24,8 +30,19 @@ export function ReservationView({ isLoggedIn }: { isLoggedIn: boolean }) {
           </p>
           <h1 className="font-serif text-4xl text-park-green">Reserve a bench</h1>
         </div>
-        <ReserveBar isLoggedIn={isLoggedIn} />
+        <ReserveBar isLoggedIn={isLoggedIn} hasActiveReservation={hasActiveReservation} />
       </div>
+
+      {hasActiveReservation && (
+        <div className="mt-4 rounded-lg border border-park-rust/30 bg-park-rust/5 px-4 py-3 text-sm text-park-rust">
+          You already have an active reservation. You can only reserve one bench at a time.
+          Cancel your current reservation from your{" "}
+          <a href="/account" className="font-semibold underline underline-offset-2">
+            account page
+          </a>{" "}
+          to reserve a different bench.
+        </div>
+      )}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <ViewToggle />
