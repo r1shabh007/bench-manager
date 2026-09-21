@@ -27,6 +27,7 @@ import {
 import { toast } from "@/lib/toast";
 import {
   adminAddBench,
+  adminBatchDeleteReservations,
   adminCreateReservation,
   adminDeleteBench,
   adminDeleteReservation,
@@ -326,6 +327,9 @@ function ReservationManagement({
   const [benchQ, setBenchQ] = React.useState("");
   const [userQ, setUserQ] = React.useState("");
   const [target, setTarget] = React.useState<AdminReservationRow | null>(null);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const [batchConfirmOpen, setBatchConfirmOpen] = React.useState(false);
+  const [batchDeleting, setBatchDeleting] = React.useState(false);
 
   const filtered = reservations.filter((r) => {
     if (status !== "all" && r.status !== status) return false;
@@ -336,10 +340,43 @@ function ReservationManagement({
     return true;
   });
 
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((r) => selected.has(r.id));
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (allFilteredSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const r of filtered) next.delete(r.id);
+        return next;
+      });
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const r of filtered) next.add(r.id);
+        return next;
+      });
+    }
+  }
+
   async function remove() {
     if (!target) return;
     const res = await adminDeleteReservation(target.id);
     if (res.ok) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(target.id);
+        return next;
+      });
       toast.success("Reservation deleted.");
       router.refresh();
     } else {
@@ -347,9 +384,25 @@ function ReservationManagement({
     }
   }
 
+  async function batchRemove() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    setBatchDeleting(true);
+    const res = await adminBatchDeleteReservations(ids);
+    setBatchDeleting(false);
+    setBatchConfirmOpen(false);
+    if (res.ok) {
+      toast.success(`Deleted ${res.deletedCount} reservation${res.deletedCount === 1 ? "" : "s"}.`);
+      setSelected(new Set());
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not delete reservations.");
+    }
+  }
+
   return (
     <Panel title="Reservation management">
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <select
           value={status}
           onChange={(e) =>
@@ -373,37 +426,65 @@ function ReservationManagement({
           onChange={(e) => setUserQ(e.target.value)}
           className="h-9 w-40 bg-park-bg/50"
         />
+        {selected.size > 0 && (
+          <button
+            onClick={() => setBatchConfirmOpen(true)}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-destructive/90"
+          >
+            <Trash2 className="size-3.5" />
+            Delete {selected.size} selected
+          </button>
+        )}
       </div>
       <div className="max-h-72 overflow-auto rounded-xl border border-park-border">
         {filtered.length === 0 ? (
           <p className="p-4 text-sm text-park-muted">No reservations found.</p>
         ) : (
-          filtered.map((r) => (
-            <div
-              key={r.id}
-              className="flex items-center justify-between gap-3 border-b border-park-border px-4 py-3 last:border-b-0"
-            >
-              <div className="min-w-0">
-                <p className="font-semibold text-park-ink">
-                  Bench {r.bench_code}
-                  <span
-                    className={cn(
-                      "ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase",
-                      r.status === "cancelled"
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-park-sage text-park-green",
-                    )}
-                  >
-                    {r.status}
-                  </span>
-                </p>
-                <p className="truncate text-sm text-park-muted">
-                  {r.username} · {formatRangeCompact(r.start_month, r.end_month)}
-                </p>
-              </div>
-              <DeleteButton onClick={() => setTarget(r)} />
+          <>
+            <div className="flex items-center gap-3 border-b border-park-border bg-park-sage/30 px-4 py-2">
+              <input
+                type="checkbox"
+                checked={allFilteredSelected}
+                onChange={toggleAll}
+                className="size-4 accent-park-green"
+              />
+              <span className="text-xs font-semibold text-park-muted">
+                Select all ({filtered.length})
+              </span>
             </div>
-          ))
+            {filtered.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center gap-3 border-b border-park-border px-4 py-3 last:border-b-0"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(r.id)}
+                  onChange={() => toggleOne(r.id)}
+                  className="size-4 shrink-0 accent-park-green"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-park-ink">
+                    Bench {r.bench_code}
+                    <span
+                      className={cn(
+                        "ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase",
+                        r.status === "cancelled"
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-park-sage text-park-green",
+                      )}
+                    >
+                      {r.status}
+                    </span>
+                  </p>
+                  <p className="truncate text-sm text-park-muted">
+                    {r.username} · {formatRangeCompact(r.start_month, r.end_month)}
+                  </p>
+                </div>
+                <DeleteButton onClick={() => setTarget(r)} />
+              </div>
+            ))}
+          </>
         )}
       </div>
 
@@ -415,6 +496,16 @@ function ReservationManagement({
         confirmLabel="Delete reservation"
         destructive
         onConfirm={remove}
+      />
+
+      <ConfirmDialog
+        open={batchConfirmOpen}
+        onOpenChange={(o) => !o && setBatchConfirmOpen(false)}
+        title={`Delete ${selected.size} reservation${selected.size === 1 ? "" : "s"}?`}
+        description="This hard-deletes all selected reservations. This cannot be undone."
+        confirmLabel={batchDeleting ? "Deleting…" : `Delete ${selected.size} reservation${selected.size === 1 ? "" : "s"}`}
+        destructive
+        onConfirm={batchRemove}
       />
     </Panel>
   );

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth";
 import type { Region } from "@/lib/types";
 
@@ -31,8 +31,6 @@ export async function adminCreateReservation(input: {
   endMonth: string;
 }): Promise<AdminResult> {
   await requireAdmin();
-  // The signed-in admin's session drives is_admin() inside create_reservation,
-  // so created_by is set and the "self only" rule is bypassed for admins.
   const supabase = await createClient();
   const { error } = await supabase.rpc("create_reservation", {
     p_user_id: input.userId,
@@ -51,8 +49,8 @@ export async function adminDeleteReservation(
   reservationId: string,
 ): Promise<AdminResult> {
   await requireAdmin();
-  const admin = createAdminClient();
-  const { error } = await admin
+  const supabase = await createClient();
+  const { error } = await supabase
     .from("reservations")
     .delete()
     .eq("id", reservationId);
@@ -62,15 +60,32 @@ export async function adminDeleteReservation(
   return { ok: true };
 }
 
+/** Hard-delete multiple reservations at once. */
+export async function adminBatchDeleteReservations(
+  reservationIds: string[],
+): Promise<AdminResult & { deletedCount?: number }> {
+  await requireAdmin();
+  if (reservationIds.length === 0) return { ok: true, deletedCount: 0 };
+  const supabase = await createClient();
+  const { error, count } = await supabase
+    .from("reservations")
+    .delete({ count: "exact" })
+    .in("id", reservationIds);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/admin");
+  revalidatePath("/reservation");
+  return { ok: true, deletedCount: count ?? reservationIds.length };
+}
+
 /** Delete a user (cascades to profile + reservations). Cannot delete admins. */
 export async function adminDeleteUser(userId: string): Promise<AdminResult> {
   const me = await requireAdmin();
   if (userId === me.id) {
     return { ok: false, error: "You cannot delete your own admin account." };
   }
-  const admin = createAdminClient();
 
-  const { data: target } = await admin
+  const supabase = await createClient();
+  const { data: target } = await supabase
     .from("profiles")
     .select("is_admin")
     .eq("id", userId)
@@ -79,8 +94,21 @@ export async function adminDeleteUser(userId: string): Promise<AdminResult> {
     return { ok: false, error: "You cannot delete another admin." };
   }
 
-  const { error } = await admin.auth.admin.deleteUser(userId);
-  if (error) return { ok: false, error: friendlyError(error.message) };
+  // Deleting the auth user requires the service-role key.
+  const admin = tryCreateAdminClient();
+  if (admin) {
+    const { error } = await admin.auth.admin.deleteUser(userId);
+    if (error) return { ok: false, error: friendlyError(error.message) };
+  } else {
+    // Without the service-role key, delete the profile (cascades reservations)
+    // but the auth.users row remains orphaned.
+    const { error } = await supabase
+      .from("profiles")
+      .delete()
+      .eq("id", userId);
+    if (error) return { ok: false, error: friendlyError(error.message) };
+  }
+
   revalidatePath("/admin");
   return { ok: true };
 }
@@ -96,12 +124,11 @@ export async function adminAddBench(input: {
   await requireAdmin();
   const code = input.code.trim().toUpperCase();
   if (!code) return { ok: false, error: "Enter a bench code." };
-  const admin = createAdminClient();
-  const { error } = await admin.from("benches").insert({
+  const supabase = await createClient();
+  const { error } = await supabase.from("benches").insert({
     code,
     region: input.region,
     description: input.description?.trim() || null,
-    // Default to the middle of the relevant band if no coordinates supplied.
     x_pct: input.xPct ?? 50,
     y_pct: input.yPct ?? defaultBandY(input.region),
   });
@@ -120,8 +147,8 @@ export async function adminAddBench(input: {
 /** Remove a bench that is no longer available for adoption. */
 export async function adminDeleteBench(benchId: string): Promise<AdminResult> {
   await requireAdmin();
-  const admin = createAdminClient();
-  const { error } = await admin.from("benches").delete().eq("id", benchId);
+  const supabase = await createClient();
+  const { error } = await supabase.from("benches").delete().eq("id", benchId);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/admin");
   revalidatePath("/reservation");
