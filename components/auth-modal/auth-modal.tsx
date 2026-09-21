@@ -27,42 +27,75 @@ export function AuthModal({
   onOpenChange,
   onSuccess,
 }: AuthModalProps) {
+  const [awaitingConfirm, setAwaitingConfirm] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open || tab !== "signup") {
+      setAwaitingConfirm(false);
+    }
+  }, [open, tab]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-sm gap-3 p-5">
         <div className="flex flex-col gap-1">
-          <DialogTitle>
-            {tab === "login" ? "Welcome back" : "Create your account"}
+          <DialogTitle className={awaitingConfirm ? "text-lg" : undefined}>
+            {awaitingConfirm
+              ? "Check your email"
+              : tab === "login"
+                ? "Welcome back"
+                : "Create your account"}
           </DialogTitle>
-          <p className="text-sm text-park-muted">
-            {tab === "login"
-              ? "Log in to reserve a bench or view your adoptions."
-              : "Sign up to adopt a bench in Van Cortlandt Park."}
-          </p>
+          {!awaitingConfirm && (
+            <p className="text-sm text-park-muted">
+              {tab === "login"
+                ? "Log in to reserve a bench or view your adoptions."
+                : "Sign up to adopt a bench in Van Cortlandt Park."}
+            </p>
+          )}
         </div>
 
-        {/* Mode switch */}
         <div className="grid grid-cols-2 gap-1 rounded-lg bg-park-sage/60 p-1">
-          <TabButton active={tab === "login"} onClick={() => onTabChange("login")}>
+          <TabButton
+            active={tab === "login"}
+            onClick={() => {
+              setAwaitingConfirm(false);
+              onTabChange("login");
+            }}
+          >
             Login
           </TabButton>
           <TabButton
             active={tab === "signup"}
-            onClick={() => onTabChange("signup")}
+            onClick={() => {
+              setAwaitingConfirm(false);
+              onTabChange("signup");
+            }}
           >
             Sign Up
           </TabButton>
         </div>
 
-        {tab === "login" ? (
+        {awaitingConfirm ? (
+          <p className="text-sm leading-relaxed text-park-green">
+            A confirmation email has been sent. Check your inbox to confirm
+            your account, then log in.
+          </p>
+        ) : tab === "login" ? (
           <LoginForm onSuccess={onSuccess} />
         ) : (
-          <SignupForm onSuccess={onSuccess} />
+          <SignupForm
+            open={open}
+            onSuccess={onSuccess}
+            onAwaitingConfirm={() => setAwaitingConfirm(true)}
+          />
         )}
 
-        <p className="text-center text-xs text-park-muted">
-          Account pages require login. Need help? Contact park support.
-        </p>
+        {!awaitingConfirm && (
+          <p className="text-center text-xs text-park-muted">
+            Account pages require login. Need help? Contact park support.
+          </p>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -157,7 +190,15 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function SignupForm({ onSuccess }: { onSuccess: () => void }) {
+function SignupForm({
+  open,
+  onSuccess,
+  onAwaitingConfirm,
+}: {
+  open: boolean;
+  onSuccess: () => void;
+  onAwaitingConfirm: () => void;
+}) {
   const [email, setEmail] = React.useState("");
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -167,24 +208,29 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
     "idle" | "checking" | "available" | "taken" | "short"
   >("idle");
 
+  React.useEffect(() => {
+    if (!open) {
+      setError(null);
+    }
+  }, [open]);
+
   // Live username availability check (debounced).
   React.useEffect(() => {
     const uname = username.trim();
     if (uname.length < 3) {
       setUsernameState(uname.length === 0 ? "idle" : "short");
-      return;
+      return undefined;
     }
     setUsernameState("checking");
-    const handle = setTimeout(async () => {
+    const handle = window.setTimeout(async () => {
       const result = await checkUsernameAvailable(uname);
       if (!result.checked) {
-        // Schema isn't reachable — don't mark every name as taken.
         setUsernameState("idle");
         return;
       }
       setUsernameState(result.available ? "available" : "taken");
     }, 400);
-    return () => clearTimeout(handle);
+    return () => window.clearTimeout(handle);
   }, [username]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -199,9 +245,7 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(false);
     if (res.ok) {
       if (res.needsConfirmation) {
-        setError(
-          "Check your email to confirm your account, then log in. (Confirmation can be turned off in Supabase.)",
-        );
+        onAwaitingConfirm();
         return;
       }
       onSuccess();
@@ -255,7 +299,9 @@ function UsernameHint({
 }: {
   state: "idle" | "checking" | "available" | "taken" | "short";
 }) {
-  if (state === "idle") return null;
+  if (state === "idle") {
+    return null;
+  }
   const map = {
     checking: { text: "Checking availability…", cls: "text-park-muted" },
     available: { text: "Username is available.", cls: "text-park-green" },
@@ -266,7 +312,9 @@ function UsernameHint({
     },
   } as const;
   const { text, cls } = map[state];
-  return <span className={cn("text-xs", cls)}>{text}</span>;
+  return (
+    <span className={cn("min-h-4 text-xs", cls)}>{text}</span>
+  );
 }
 
 function SubmitButton({
@@ -280,7 +328,7 @@ function SubmitButton({
     <button
       type="submit"
       disabled={loading}
-      className="mt-1 inline-flex h-11 items-center justify-center gap-2 rounded-md bg-park-green px-4 text-sm font-bold text-white transition-colors hover:bg-park-green/90 disabled:opacity-60"
+      className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-park-green px-4 text-sm font-bold text-white transition-colors hover:bg-park-green/90 disabled:opacity-60"
     >
       {loading && <Loader2 className="size-4 animate-spin" />}
       {children}
