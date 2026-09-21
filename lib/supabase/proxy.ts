@@ -7,8 +7,7 @@ export async function updateSession(request: NextRequest) {
     request,
   });
 
-  // If the env vars are not set, skip proxy check. You can remove this
-  // once you setup the project.
+  // If the env vars are not set, skip the auth check.
   if (!hasEnvVars) {
     return supabaseResponse;
   }
@@ -17,7 +16,8 @@ export async function updateSession(request: NextRequest) {
   // variable. Always create a new one on each request.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
     {
       cookies: {
         getAll() {
@@ -38,39 +38,45 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getClaims(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  // IMPORTANT: If you remove getClaims() and you use server-side rendering
-  // with the Supabase client, your users may be randomly logged out.
+  // Do not run code between createServerClient and getClaims().
+  // IMPORTANT: getClaims() refreshes the session so users aren't logged out.
   const { data } = await supabase.auth.getClaims();
-  const user = data?.claims;
+  const claims = data?.claims;
+  const pathname = request.nextUrl.pathname;
 
-  if (
-    request.nextUrl.pathname !== "/" &&
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  // Protect /account — logged-out users are sent Home with ?login=1 so Home can
+  // auto-open the auth modal and resume the intended flow (spec §4).
+  if (pathname.startsWith("/account") && !claims) {
     const url = request.nextUrl.clone();
-    url.pathname = "/auth/login";
+    url.pathname = "/";
+    url.search = "?login=1";
     return NextResponse.redirect(url);
   }
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  // If you're creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
+  // Protect /admin — logged-out users go to Home with ?login=1; non-admins are
+  // redirected Home. `is_admin` lives on the profile, checked below.
+  if (pathname.startsWith("/admin")) {
+    if (!claims) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "?login=1";
+      return NextResponse.redirect(url);
+    }
 
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", claims.sub)
+      .single();
+
+    if (!profile?.is_admin) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // IMPORTANT: You *must* return the supabaseResponse object as-is to keep the
+  // browser and server sessions in sync.
   return supabaseResponse;
 }

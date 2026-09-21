@@ -10,9 +10,38 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-inter)", "ui-sans-serif", "system-ui", "sans-serif"],
+        serif: ["var(--font-lora)", "Georgia", "serif"],
+      },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        // Domain palette pulled straight from Figma (`Bench-manager-design`).
+        park: {
+          bg: "#f4f1e8",
+          surface: "#fffdf8",
+          border: "#d7d2c5",
+          green: "#214f3b",
+          rust: "#76533b",
+          muted: "#667069",
+          sage: "#e3e9de",
+          ink: "#203029",
+          footer: "#dce8df",
+        },
+        // Bench dot colors are REQUIRED by the spec (§5.2).
+        bench: {
+          available: "#B85C5C",
+          unavailable: "#9CA3AF",
+          selected: "#FFD60A",
+        },
+        // Calendar month-block colors from Figma.
+        month: {
+          selected: "#f3ca52",
+          "selected-border": "#76533b",
+          unavailable: "#a9aaa4",
+          summary: "#fff4c7",
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
