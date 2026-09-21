@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -27,7 +27,9 @@ import {
 import { toast } from "@/lib/toast";
 import {
   adminAddBench,
+  adminBatchCancelReservations,
   adminBatchDeleteReservations,
+  adminCancelReservation,
   adminCreateReservation,
   adminDeleteBench,
   adminDeleteReservation,
@@ -60,8 +62,8 @@ export function AdminView({
       <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
         <div className="flex flex-col gap-6">
           <UserManagement users={users} meId={me.id} />
-          <BenchManagement benches={benches} />
           <ReservationManagement reservations={reservations} />
+          <BenchManagement benches={benches} />
         </div>
         <CreateReservationPanel users={users} benches={benches} />
       </div>
@@ -96,6 +98,17 @@ function DeleteButton({ onClick }: { onClick: () => void }) {
       className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/20"
     >
       <Trash2 className="size-3.5" /> Delete
+    </button>
+  );
+}
+
+function CancelButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-700 transition-colors hover:bg-amber-500/20"
+    >
+      <XCircle className="size-3.5" /> Cancel
     </button>
   );
 }
@@ -326,10 +339,14 @@ function ReservationManagement({
   );
   const [benchQ, setBenchQ] = React.useState("");
   const [userQ, setUserQ] = React.useState("");
-  const [target, setTarget] = React.useState<AdminReservationRow | null>(null);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
-  const [batchConfirmOpen, setBatchConfirmOpen] = React.useState(false);
+
+  const [deleteTarget, setDeleteTarget] = React.useState<AdminReservationRow | null>(null);
+  const [cancelTarget, setCancelTarget] = React.useState<AdminReservationRow | null>(null);
+  const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
+  const [batchCancelOpen, setBatchCancelOpen] = React.useState(false);
   const [batchDeleting, setBatchDeleting] = React.useState(false);
+  const [batchCancelling, setBatchCancelling] = React.useState(false);
 
   const filtered = reservations.filter((r) => {
     if (status !== "all" && r.status !== status) return false;
@@ -342,6 +359,10 @@ function ReservationManagement({
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((r) => selected.has(r.id));
+
+  const selectedActiveCount = reservations.filter(
+    (r) => selected.has(r.id) && r.status === "active",
+  ).length;
 
   function toggleOne(id: string) {
     setSelected((prev) => {
@@ -368,13 +389,13 @@ function ReservationManagement({
     }
   }
 
-  async function remove() {
-    if (!target) return;
-    const res = await adminDeleteReservation(target.id);
+  async function removeSingle() {
+    if (!deleteTarget) return;
+    const res = await adminDeleteReservation(deleteTarget.id);
     if (res.ok) {
       setSelected((prev) => {
         const next = new Set(prev);
-        next.delete(target.id);
+        next.delete(deleteTarget.id);
         return next;
       });
       toast.success("Reservation deleted.");
@@ -384,19 +405,47 @@ function ReservationManagement({
     }
   }
 
+  async function cancelSingle() {
+    if (!cancelTarget) return;
+    const res = await adminCancelReservation(cancelTarget.id);
+    if (res.ok) {
+      toast.success("Reservation cancelled.");
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not cancel reservation.");
+    }
+  }
+
   async function batchRemove() {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
     setBatchDeleting(true);
     const res = await adminBatchDeleteReservations(ids);
     setBatchDeleting(false);
-    setBatchConfirmOpen(false);
+    setBatchDeleteOpen(false);
     if (res.ok) {
       toast.success(`Deleted ${res.deletedCount} reservation${res.deletedCount === 1 ? "" : "s"}.`);
       setSelected(new Set());
       router.refresh();
     } else {
       toast.error(res.error ?? "Could not delete reservations.");
+    }
+  }
+
+  async function batchCancel() {
+    const ids = reservations
+      .filter((r) => selected.has(r.id) && r.status === "active")
+      .map((r) => r.id);
+    if (ids.length === 0) return;
+    setBatchCancelling(true);
+    const res = await adminBatchCancelReservations(ids);
+    setBatchCancelling(false);
+    setBatchCancelOpen(false);
+    if (res.ok) {
+      toast.success(`Cancelled ${res.cancelledCount} reservation${res.cancelledCount === 1 ? "" : "s"}.`);
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not cancel reservations.");
     }
   }
 
@@ -427,13 +476,24 @@ function ReservationManagement({
           className="h-9 w-40 bg-park-bg/50"
         />
         {selected.size > 0 && (
-          <button
-            onClick={() => setBatchConfirmOpen(true)}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-destructive/90"
-          >
-            <Trash2 className="size-3.5" />
-            Delete {selected.size} selected
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {selectedActiveCount > 0 && (
+              <button
+                onClick={() => setBatchCancelOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-amber-600"
+              >
+                <XCircle className="size-3.5" />
+                Cancel {selectedActiveCount} active
+              </button>
+            )}
+            <button
+              onClick={() => setBatchDeleteOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-destructive/90"
+            >
+              <Trash2 className="size-3.5" />
+              Delete {selected.size} selected
+            </button>
+          </div>
         )}
       </div>
       <div className="max-h-72 overflow-auto rounded-xl border border-park-border">
@@ -481,7 +541,12 @@ function ReservationManagement({
                     {r.username} · {formatRangeCompact(r.start_month, r.end_month)}
                   </p>
                 </div>
-                <DeleteButton onClick={() => setTarget(r)} />
+                <div className="flex items-center gap-1.5">
+                  {r.status === "active" && (
+                    <CancelButton onClick={() => setCancelTarget(r)} />
+                  )}
+                  <DeleteButton onClick={() => setDeleteTarget(r)} />
+                </div>
               </div>
             ))}
           </>
@@ -489,23 +554,43 @@ function ReservationManagement({
       </div>
 
       <ConfirmDialog
-        open={Boolean(target)}
-        onOpenChange={(o) => !o && setTarget(null)}
+        open={Boolean(deleteTarget)}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
         title="Delete reservation?"
         description="This hard-deletes the reservation. This cannot be undone."
         confirmLabel="Delete reservation"
         destructive
-        onConfirm={remove}
+        onConfirm={removeSingle}
       />
 
       <ConfirmDialog
-        open={batchConfirmOpen}
-        onOpenChange={(o) => !o && setBatchConfirmOpen(false)}
+        open={Boolean(cancelTarget)}
+        onOpenChange={(o) => !o && setCancelTarget(null)}
+        title="Cancel reservation?"
+        description="This marks the reservation as cancelled. The bench will become available for others."
+        confirmLabel="Cancel reservation"
+        destructive
+        onConfirm={cancelSingle}
+      />
+
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onOpenChange={(o) => !o && setBatchDeleteOpen(false)}
         title={`Delete ${selected.size} reservation${selected.size === 1 ? "" : "s"}?`}
         description="This hard-deletes all selected reservations. This cannot be undone."
         confirmLabel={batchDeleting ? "Deleting…" : `Delete ${selected.size} reservation${selected.size === 1 ? "" : "s"}`}
         destructive
         onConfirm={batchRemove}
+      />
+
+      <ConfirmDialog
+        open={batchCancelOpen}
+        onOpenChange={(o) => !o && setBatchCancelOpen(false)}
+        title={`Cancel ${selectedActiveCount} active reservation${selectedActiveCount === 1 ? "" : "s"}?`}
+        description="This marks the selected active reservations as cancelled. Their benches will become available for others."
+        confirmLabel={batchCancelling ? "Cancelling…" : `Cancel ${selectedActiveCount} reservation${selectedActiveCount === 1 ? "" : "s"}`}
+        destructive
+        onConfirm={batchCancel}
       />
     </Panel>
   );

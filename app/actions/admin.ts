@@ -77,6 +77,47 @@ export async function adminBatchDeleteReservations(
   return { ok: true, deletedCount: count ?? reservationIds.length };
 }
 
+/** Cancel an active reservation (sets status to cancelled). */
+export async function adminCancelReservation(
+  reservationId: string,
+): Promise<AdminResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cancel_reservation", {
+    p_reservation_id: reservationId,
+  });
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/admin");
+  revalidatePath("/reservation");
+  revalidatePath("/account");
+  return { ok: true };
+}
+
+/** Cancel multiple active reservations at once. */
+export async function adminBatchCancelReservations(
+  reservationIds: string[],
+): Promise<AdminResult & { cancelledCount?: number }> {
+  await requireAdmin();
+  if (reservationIds.length === 0) return { ok: true, cancelledCount: 0 };
+  const supabase = await createClient();
+  const errors: string[] = [];
+  let cancelled = 0;
+  for (const id of reservationIds) {
+    const { error } = await supabase.rpc("cancel_reservation", {
+      p_reservation_id: id,
+    });
+    if (error) errors.push(error.message);
+    else cancelled++;
+  }
+  revalidatePath("/admin");
+  revalidatePath("/reservation");
+  revalidatePath("/account");
+  if (errors.length > 0 && cancelled === 0) {
+    return { ok: false, error: friendlyError(errors[0]) };
+  }
+  return { ok: true, cancelledCount: cancelled };
+}
+
 /** Delete a user (cascades to profile + reservations). Cannot delete admins. */
 export async function adminDeleteUser(userId: string): Promise<AdminResult> {
   const me = await requireAdmin();
