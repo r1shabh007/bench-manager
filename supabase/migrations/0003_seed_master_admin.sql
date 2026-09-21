@@ -1,0 +1,12 @@
+-- Step 1: Run the cleanup + admin creation SQL below in the Supabase SQL Editor.
+-- Step 2: Then call the sign-up API (see scripts/create-admin.ts).
+-- Step 3: Then run the promote SQL to flag the user as admin.
+--
+-- This file documents the full process. See scripts/create-admin.ts for the
+-- automated version that handles all three steps.
+
+-- PROMOTE ADMIN (run AFTER the user is created via the auth API):
+-- ALTER TABLE public.profiles DISABLE TRIGGER profiles_guard_is_admin;
+-- UPDATE public.profiles SET is_admin = true WHERE email = 'ra3528@columbia.edu';
+-- UPDATE public.profiles SET is_admin = false WHERE email != 'ra3528@columbia.edu';
+-- ALTER TABLE public.profiles ENABLE TRIGGER profiles_guard_is_admin;
