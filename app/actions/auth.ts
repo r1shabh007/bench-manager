@@ -1,7 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { tryCreateAdminClient } from "@/lib/supabase/admin";
+import { ensureProfile } from "@/lib/auth";
 
 export interface AuthResult {
   ok: boolean;
@@ -9,34 +10,73 @@ export interface AuthResult {
   needsConfirmation?: boolean;
 }
 
+export interface UsernameCheck {
+  available: boolean;
+  /** False when we couldn't reach the profiles table/RPC (don't treat as taken). */
+  checked: boolean;
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeUsername(raw: string): string {
+  return raw.trim();
+}
+
+async function emailForUsername(uname: string): Promise<string | null> {
+  const admin = tryCreateAdminClient();
+  if (admin) {
+    const { data } = await admin.rpc("get_email_for_username", {
+      p_username: uname,
+    });
+    if (typeof data === "string" && data) return data;
+
+    // Fallback: scan auth users' metadata (covers accounts created before
+    // the profiles table existed).
+    const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    const match = list?.users?.find((u) => {
+      const meta = String(u.user_metadata?.username ?? "").trim().toLowerCase();
+      return meta === uname.toLowerCase();
+    });
+    if (match?.email) return match.email;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_email_for_username", {
+    p_username: uname,
+  });
+  if (!error && typeof data === "string" && data) return data;
+
+  // Last resort: profiles row readable under RLS (own row only — useful if
+  // the caller is already signed in; otherwise this returns nothing).
+  const { data: row } = await supabase
+    .from("profiles")
+    .select("email")
+    .ilike("username", uname)
+    .maybeSingle();
+  return row?.email ?? null;
+}
 
 /**
  * Log in with username + password. Supabase authenticates by email, so we look
- * up the email server-side with the service-role client (never returned to the
- * client) and then sign in with the SSR server client so the cookie is set.
+ * up the email server-side and never return it to the client.
  */
 export async function loginWithUsername(
   username: string,
   password: string,
 ): Promise<AuthResult> {
-  const uname = username.trim();
+  const uname = normalizeUsername(username);
   if (!uname || !password) {
     return { ok: false, error: "Invalid username or password" };
   }
 
   let email: string | null = null;
   try {
-    const admin = createAdminClient();
-    const { data } = await admin.rpc("get_email_for_username", {
-      p_username: uname,
-    });
-    email = (data as string | null) ?? null;
-  } catch {
+    email = await emailForUsername(uname);
+  } catch (err) {
+    console.warn("[loginWithUsername]", err);
     return { ok: false, error: "Something went wrong. Please try again." };
   }
 
-  // Generic message on any failure so usernames/emails can't be probed.
   if (!email) {
     return { ok: false, error: "Invalid username or password" };
   }
@@ -46,26 +86,48 @@ export async function loginWithUsername(
   if (error) {
     return { ok: false, error: "Invalid username or password" };
   }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) await ensureProfile(user);
+
   return { ok: true };
 }
 
 /** Live username availability check (case-insensitive). */
 export async function checkUsernameAvailable(
   username: string,
-): Promise<boolean> {
-  const uname = username.trim();
-  if (uname.length < 3) return false;
+): Promise<UsernameCheck> {
+  const uname = normalizeUsername(username);
+  if (uname.length < 3) return { available: false, checked: true };
+
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("username_available", {
-    p_username: uname,
-  });
-  if (error) return false;
-  return Boolean(data);
+
+  const rpc = await supabase.rpc("username_available", { p_username: uname });
+  if (!rpc.error) {
+    return { available: rpc.data === true, checked: true };
+  }
+
+  // RPC missing (schema not applied yet). Try a direct read.
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id")
+    .ilike("username", uname.replace(/[%_]/g, "\\$&"))
+    .limit(1);
+
+  if (error) {
+    // Table doesn't exist yet — do NOT treat every name as taken.
+    console.warn("[checkUsernameAvailable]", rpc.error.message, error.message);
+    return { available: true, checked: false };
+  }
+
+  return { available: !data || data.length === 0, checked: true };
 }
 
 /**
- * Sign up with email, unique username, and any password. The DB trigger creates
- * the matching profile row from the username in user metadata.
+ * Sign up with email, unique username, and any password. The username is stored
+ * in auth user_metadata and in `profiles` (via trigger + an explicit insert).
  */
 export async function signUpWithUsername(
   email: string,
@@ -73,7 +135,7 @@ export async function signUpWithUsername(
   password: string,
 ): Promise<AuthResult> {
   const mail = email.trim();
-  const uname = username.trim();
+  const uname = normalizeUsername(username);
 
   if (!EMAIL_RE.test(mail)) {
     return { ok: false, error: "Enter a valid email address." };
@@ -85,9 +147,8 @@ export async function signUpWithUsername(
     return { ok: false, error: "Enter a password." };
   }
 
-  // Final server-side uniqueness check (the DB also enforces this).
-  const available = await checkUsernameAvailable(uname);
-  if (!available) {
+  const availability = await checkUsernameAvailable(uname);
+  if (availability.checked && !availability.available) {
     return { ok: false, error: "That username is already taken." };
   }
 
@@ -99,11 +160,17 @@ export async function signUpWithUsername(
   });
 
   if (error) {
+    const message = error.message.toLowerCase();
+    if (message.includes("already taken") || message.includes("unique")) {
+      return { ok: false, error: "That username is already taken." };
+    }
     return { ok: false, error: error.message };
   }
 
-  // If email confirmation is off, a session is set and the user is logged in.
-  // If it's on, there is no session yet.
+  if (data.user) {
+    await ensureProfile(data.user);
+  }
+
   const needsConfirmation = !data.session;
   return { ok: true, needsConfirmation };
 }

@@ -176,8 +176,13 @@ function SignupForm({ onSuccess }: { onSuccess: () => void }) {
     }
     setUsernameState("checking");
     const handle = setTimeout(async () => {
-      const available = await checkUsernameAvailable(uname);
-      setUsernameState(available ? "available" : "taken");
+      const result = await checkUsernameAvailable(uname);
+      if (!result.checked) {
+        // Schema isn't reachable — don't mark every name as taken.
+        setUsernameState("idle");
+        return;
+      }
+      setUsernameState(result.available ? "available" : "taken");
     }, 400);
     return () => clearTimeout(handle);
   }, [username]);

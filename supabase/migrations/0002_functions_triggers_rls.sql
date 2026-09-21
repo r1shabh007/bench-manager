@@ -25,8 +25,12 @@ begin
     coalesce(nullif(new.raw_user_meta_data->>'username', ''), split_part(new.email, '@', 1)),
     new.email
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update
+    set username = excluded.username,
+        email = excluded.email;
   return new;
+exception when unique_violation then
+  raise exception 'That username is already taken';
 end;
 $$;
 
@@ -203,7 +207,10 @@ set search_path = public
 as $$
   select email from profiles where lower(username) = lower(p_username) limit 1;
 $$;
-revoke all on function public.get_email_for_username(text) from public, anon, authenticated;
+revoke all on function public.get_email_for_username(text) from public;
+-- Callable from the username-login Server Action (the email is never returned
+-- to the browser). Prefer SUPABASE_SERVICE_ROLE_KEY when it is set.
+grant execute on function public.get_email_for_username(text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security
@@ -246,6 +253,8 @@ create policy "reservations_admin_delete" on reservations
 -- profiles: users read/update their own row; admins read all.
 create policy "profiles_select_own_or_admin" on profiles
   for select using (auth.uid() = id or public.is_admin());
+create policy "profiles_insert_own" on profiles
+  for insert with check (auth.uid() = id and is_admin = false);
 create policy "profiles_update_own" on profiles
   for update using (auth.uid() = id or public.is_admin())
   with check (auth.uid() = id or public.is_admin());
