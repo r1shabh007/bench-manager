@@ -1,19 +1,22 @@
 /**
- * Seed predefined admin accounts from ADMIN_EMAILS using the service-role
- * client. Each admin gets a generated password that is printed to the console
- * ONCE — copy it somewhere safe. Re-running is idempotent: existing users are
- * looked up and simply (re)flagged as admins.
+ * Seed the master admin account using the service-role client.
+ * Re-running is idempotent: if the admin user already exists it is
+ * simply (re)flagged as admin.
  *
  * Usage:
  *   pnpm tsx scripts/seed-admins.ts
  * (loads .env.local automatically)
  */
 import { createClient } from "@supabase/supabase-js";
-import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// Minimal .env.local loader (no dependency on dotenv).
+const MASTER_ADMIN = {
+  email: "ra3528@columbia.edu",
+  username: "admin",
+  password: "password",
+};
+
 function loadEnvLocal() {
   try {
     const raw = readFileSync(resolve(process.cwd(), ".env.local"), "utf8");
@@ -31,20 +34,11 @@ function loadEnvLocal() {
   }
 }
 
-function generatePassword() {
-  // URL-safe, ~24 chars.
-  return randomBytes(18).toString("base64url");
-}
-
 async function main() {
   loadEnvLocal();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
 
   if (!url || !serviceKey) {
     console.error(
@@ -52,57 +46,64 @@ async function main() {
     );
     process.exit(1);
   }
-  if (adminEmails.length === 0) {
-    console.error("ADMIN_EMAILS is empty. Set a comma-separated list in .env.local");
-    process.exit(1);
-  }
 
   const supabase = createClient(url, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  for (const email of adminEmails) {
-    const username = email.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_");
+  const { email, username, password } = MASTER_ADMIN;
 
-    // Try to find an existing auth user with this email.
-    const { data: list } = await supabase.auth.admin.listUsers();
-    const existing = list?.users?.find(
-      (u) => u.email?.toLowerCase() === email,
-    );
+  // Check if the admin user already exists.
+  const { data: list } = await supabase.auth.admin.listUsers();
+  const existing = list?.users?.find(
+    (u) => u.email?.toLowerCase() === email.toLowerCase(),
+  );
 
-    let userId = existing?.id;
+  let userId = existing?.id;
 
-    if (!userId) {
-      const password = generatePassword();
-      const { data, error } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { username },
-      });
-      if (error || !data.user) {
-        console.error(`Failed to create ${email}:`, error?.message);
-        continue;
-      }
-      userId = data.user.id;
-      console.log(`Created admin ${email}`);
-      console.log(`   username: ${username}`);
-      console.log(`   password: ${password}   <-- shown once, save it now`);
-    } else {
-      console.log(`Admin ${email} already exists (${userId}); flagging as admin.`);
+  if (!userId) {
+    const { data, error } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { username },
+    });
+    if (error || !data.user) {
+      console.error(`Failed to create master admin:`, error?.message);
+      process.exit(1);
     }
-
-    // Ensure a profile row exists (the trigger normally creates it) and flag admin.
-    await supabase
-      .from("profiles")
-      .upsert(
-        { id: userId, email, username, is_admin: true },
-        { onConflict: "id" },
-      );
-    await supabase.from("profiles").update({ is_admin: true }).eq("id", userId);
+    userId = data.user.id;
+    console.log(`Created master admin account`);
+    console.log(`  email:    ${email}`);
+    console.log(`  username: ${username}`);
+    console.log(`  password: ${password}`);
+  } else {
+    // Update password in case it was changed, so re-running resets it.
+    await supabase.auth.admin.updateUserById(userId, { password });
+    console.log(`Master admin already exists (${userId}); ensured admin flag.`);
   }
 
-  console.log("Done seeding admins.");
+  // Ensure profile row exists and is_admin = true.
+  await supabase
+    .from("profiles")
+    .upsert(
+      { id: userId, email, username, is_admin: true },
+      { onConflict: "id" },
+    );
+
+  // Ensure all other users are NOT admins.
+  const { error: demoteError } = await supabase
+    .from("profiles")
+    .update({ is_admin: false })
+    .neq("id", userId);
+
+  if (demoteError) {
+    console.warn("Warning: could not demote other users:", demoteError.message);
+  } else {
+    console.log("Ensured all other users are non-admin.");
+  }
+
+  console.log("Done.");
 }
 
 main().catch((err) => {
