@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Trash2, XCircle } from "lucide-react";
+import { Loader2, Trash2, XCircle, Lock, Unlock, Pencil, Move } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -28,13 +28,19 @@ import { toast } from "@/lib/toast";
 import {
   adminAddBench,
   adminBatchCancelReservations,
+  adminBatchDeleteBenches,
   adminBatchDeleteReservations,
+  adminBatchRestrictBenches,
+  adminBatchUnrestrictBenches,
   adminCancelReservation,
   adminCreateReservation,
   adminDeleteBench,
   adminDeleteReservation,
   adminDeleteUser,
+  adminUpdateBench,
+  adminUpdateBenchCoordinates,
 } from "@/app/actions/admin";
+import { AdminBenchMap } from "./admin-bench-map";
 
 export function AdminView({
   me,
@@ -47,8 +53,44 @@ export function AdminView({
   reservations: AdminReservationRow[];
   benches: Bench[];
 }) {
+  const router = useRouter();
+  const [selectedBenchIds, setSelectedBenchIds] = React.useState<Set<string>>(
+    new Set(),
+  );
+  const [mapMoveId, setMapMoveId] = React.useState<string | null>(null);
+
+  function toggleBenchSelect(id: string, multi: boolean) {
+    setSelectedBenchIds((prev) => {
+      const next = new Set(multi ? prev : []);
+      if (prev.has(id) && (multi || prev.size === 1)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function handleStartMove(benchId: string) {
+    setSelectedBenchIds(new Set([benchId]));
+    setMapMoveId(benchId);
+  }
+
+  async function handleEditBench(
+    benchId: string,
+    updates: { code?: string; region?: Region },
+  ) {
+    const res = await adminUpdateBench(benchId, updates);
+    if (res.ok) {
+      toast.success("Bench updated.");
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not update bench.");
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-6xl px-5 py-8 sm:px-10">
+    <div className="mx-auto max-w-7xl px-5 py-8 sm:px-10">
       <p className="text-xs font-bold uppercase tracking-wide text-park-rust">
         Authenticated admin workspace
       </p>
@@ -59,15 +101,162 @@ export function AdminView({
         {me.email} · Predefined administrator account
       </p>
 
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <div className="flex flex-col gap-6">
-          <UserManagement users={users} meId={me.id} />
-          <ReservationManagement reservations={reservations} />
-          <BenchManagement benches={benches} />
-        </div>
+      {/* User management — full width */}
+      <UserManagement users={users} meId={me.id} />
+
+      {/* Reservation management + Create reservation — side by side */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <ReservationManagement reservations={reservations} />
         <CreateReservationPanel users={users} benches={benches} />
       </div>
+
+      {/* Bench management + Map — side by side */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <BenchManagement
+          benches={benches}
+          selectedIds={selectedBenchIds}
+          onToggleSelect={toggleBenchSelect}
+          onSetSelected={setSelectedBenchIds}
+          onStartMove={handleStartMove}
+          onEditBench={handleEditBench}
+        />
+        <AdminBenchMapSection
+          benches={benches}
+          selectedIds={selectedBenchIds}
+          onToggleSelect={toggleBenchSelect}
+          onSetSelected={setSelectedBenchIds}
+          externalMoveId={mapMoveId}
+          onClearExternalMove={() => setMapMoveId(null)}
+        />
+      </div>
     </div>
+  );
+}
+
+function AdminBenchMapSection({
+  benches,
+  selectedIds,
+  onToggleSelect,
+  onSetSelected,
+  externalMoveId,
+  onClearExternalMove,
+}: {
+  benches: Bench[];
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string, multi: boolean) => void;
+  onSetSelected: (ids: Set<string>) => void;
+  externalMoveId: string | null;
+  onClearExternalMove: () => void;
+}) {
+  const router = useRouter();
+  const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
+  const [batchRestrictOpen, setBatchRestrictOpen] = React.useState(false);
+  const [batchUnrestrictOpen, setBatchUnrestrictOpen] = React.useState(false);
+  const [pendingIds, setPendingIds] = React.useState<string[]>([]);
+
+  async function handleUpdateCoordinates(
+    id: string,
+    lat: number,
+    lng: number,
+  ): Promise<boolean> {
+    const res = await adminUpdateBenchCoordinates(id, lat, lng);
+    if (res.ok) {
+      toast.success("Coordinates updated.");
+      router.refresh();
+      return true;
+    }
+    toast.error(res.error ?? "Could not update coordinates.");
+    return false;
+  }
+
+  async function handleBatchRestrict() {
+    if (pendingIds.length === 0) return;
+    const res = await adminBatchRestrictBenches(pendingIds);
+    setBatchRestrictOpen(false);
+    if (res.ok) {
+      toast.success(`Restricted ${pendingIds.length} bench${pendingIds.length === 1 ? "" : "es"}.`);
+      onSetSelected(new Set());
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not restrict benches.");
+    }
+  }
+
+  async function handleBatchUnrestrict() {
+    if (pendingIds.length === 0) return;
+    const res = await adminBatchUnrestrictBenches(pendingIds);
+    setBatchUnrestrictOpen(false);
+    if (res.ok) {
+      toast.success(`Unrestricted ${pendingIds.length} bench${pendingIds.length === 1 ? "" : "es"}.`);
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not unrestrict benches.");
+    }
+  }
+
+  async function handleBatchDelete() {
+    if (pendingIds.length === 0) return;
+    const res = await adminBatchDeleteBenches(pendingIds);
+    setBatchDeleteOpen(false);
+    if (res.ok) {
+      toast.success(`Deleted ${res.deletedCount} bench${res.deletedCount === 1 ? "" : "es"}.`);
+      onSetSelected(new Set());
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not delete benches.");
+    }
+  }
+
+  return (
+    <Panel title="Map">
+      <AdminBenchMap
+        benches={benches}
+        selectedIds={selectedIds}
+        onToggleSelect={onToggleSelect}
+        onUpdateCoordinates={handleUpdateCoordinates}
+        externalMoveId={externalMoveId}
+        onClearExternalMove={onClearExternalMove}
+        onBatchRestrict={(ids) => {
+          setPendingIds(ids);
+          setBatchRestrictOpen(true);
+        }}
+        onBatchUnrestrict={(ids) => {
+          setPendingIds(ids);
+          setBatchUnrestrictOpen(true);
+        }}
+        onBatchDelete={(ids) => {
+          setPendingIds(ids);
+          setBatchDeleteOpen(true);
+        }}
+      />
+
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onOpenChange={(o) => !o && setBatchDeleteOpen(false)}
+        title={`Delete ${pendingIds.length} bench${pendingIds.length === 1 ? "" : "es"}?`}
+        description="This permanently removes the selected benches and their reservations."
+        confirmLabel={`Delete ${pendingIds.length} bench${pendingIds.length === 1 ? "" : "es"}`}
+        destructive
+        onConfirm={handleBatchDelete}
+      />
+      <ConfirmDialog
+        open={batchRestrictOpen}
+        onOpenChange={(o) => !o && setBatchRestrictOpen(false)}
+        title={`Restrict ${pendingIds.length} bench${pendingIds.length === 1 ? "" : "es"}?`}
+        description="Restricted benches will appear as unavailable to the public."
+        confirmLabel={`Restrict ${pendingIds.length} bench${pendingIds.length === 1 ? "" : "es"}`}
+        destructive
+        onConfirm={handleBatchRestrict}
+      />
+      <ConfirmDialog
+        open={batchUnrestrictOpen}
+        onOpenChange={(o) => !o && setBatchUnrestrictOpen(false)}
+        title={`Unrestrict ${pendingIds.length} bench${pendingIds.length === 1 ? "" : "es"}?`}
+        description="These benches will become available for adoption again."
+        confirmLabel={`Unrestrict ${pendingIds.length} bench${pendingIds.length === 1 ? "" : "es"}`}
+        onConfirm={handleBatchUnrestrict}
+      />
+    </Panel>
   );
 }
 
@@ -150,7 +339,7 @@ function UserManagement({
         onChange={(e) => setQuery(e.target.value)}
         className="mb-3 bg-park-bg/50"
       />
-      <div className="overflow-hidden rounded-xl border border-park-border">
+      <div className="max-h-64 overflow-auto rounded-xl border border-park-border">
         {filtered.length === 0 ? (
           <p className="p-4 text-sm text-park-muted">No users found.</p>
         ) : (
@@ -200,18 +389,70 @@ function UserManagement({
 }
 
 // ---------------------------------------------------------------- Benches
-function BenchManagement({ benches }: { benches: Bench[] }) {
+function BenchManagement({
+  benches,
+  selectedIds,
+  onToggleSelect,
+  onSetSelected,
+  onStartMove,
+  onEditBench,
+}: {
+  benches: Bench[];
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string, multi: boolean) => void;
+  onSetSelected: (ids: Set<string>) => void;
+  onStartMove: (benchId: string) => void;
+  onEditBench: (benchId: string, updates: { code?: string; region?: Region }) => Promise<void>;
+}) {
   const router = useRouter();
   const [code, setCode] = React.useState("");
   const [region, setRegion] = React.useState<Region>("north");
   const [description, setDescription] = React.useState("");
   const [adding, setAdding] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const [target, setTarget] = React.useState<Bench | null>(null);
+  const [regionFilter, setRegionFilter] = React.useState<Region | "all">("all");
+  const [showSelectedOnly, setShowSelectedOnly] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<Bench | null>(null);
+  const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
+  const [batchRestrictOpen, setBatchRestrictOpen] = React.useState(false);
+  const [batchUnrestrictOpen, setBatchUnrestrictOpen] = React.useState(false);
+  const [editingBenchId, setEditingBenchId] = React.useState<string | null>(null);
+  const [editCode, setEditCode] = React.useState("");
+  const [editRegion, setEditRegion] = React.useState<Region>("north");
+  const [editSaving, setEditSaving] = React.useState(false);
 
-  const filtered = benches.filter((b) =>
-    b.code.toLowerCase().includes(query.toLowerCase()),
-  );
+  const singleSelected = selectedIds.size === 1
+    ? benches.find((b) => b.id === Array.from(selectedIds)[0]) ?? null
+    : null;
+
+  const filtered = benches.filter((b) => {
+    if (showSelectedOnly && !selectedIds.has(b.id)) return false;
+    if (regionFilter !== "all" && b.region !== regionFilter) return false;
+    if (query && !b.code.toLowerCase().includes(query.toLowerCase())) return false;
+    return true;
+  });
+
+  const allFilteredSelected =
+    filtered.length > 0 && filtered.every((b) => selectedIds.has(b.id));
+
+  const selectedRestrictedCount = benches.filter(
+    (b) => selectedIds.has(b.id) && b.restricted,
+  ).length;
+  const selectedUnrestrictedCount = benches.filter(
+    (b) => selectedIds.has(b.id) && !b.restricted,
+  ).length;
+
+  function toggleAll() {
+    if (allFilteredSelected) {
+      const next = new Set(selectedIds);
+      for (const b of filtered) next.delete(b.id);
+      onSetSelected(next);
+    } else {
+      const next = new Set(selectedIds);
+      for (const b of filtered) next.add(b.id);
+      onSetSelected(next);
+    }
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -228,23 +469,79 @@ function BenchManagement({ benches }: { benches: Bench[] }) {
     }
   }
 
-  async function remove() {
-    if (!target) return;
-    const res = await adminDeleteBench(target.id);
+  async function removeSingle() {
+    if (!deleteTarget) return;
+    const res = await adminDeleteBench(deleteTarget.id);
     if (res.ok) {
-      toast.success(`Removed bench ${target.code}.`);
+      toast.success(`Removed bench ${deleteTarget.code}.`);
+      const next = new Set(selectedIds);
+      next.delete(deleteTarget.id);
+      onSetSelected(next);
       router.refresh();
     } else {
       toast.error(res.error ?? "Could not remove bench.");
     }
   }
 
+  async function batchDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const res = await adminBatchDeleteBenches(ids);
+    setBatchDeleteOpen(false);
+    if (res.ok) {
+      toast.success(
+        `Deleted ${res.deletedCount} bench${res.deletedCount === 1 ? "" : "es"}.`,
+      );
+      onSetSelected(new Set());
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not delete benches.");
+    }
+  }
+
+  async function batchRestrict() {
+    const ids = benches
+      .filter((b) => selectedIds.has(b.id) && !b.restricted)
+      .map((b) => b.id);
+    if (ids.length === 0) return;
+    const res = await adminBatchRestrictBenches(ids);
+    setBatchRestrictOpen(false);
+    if (res.ok) {
+      toast.success(`Restricted ${ids.length} bench${ids.length === 1 ? "" : "es"}.`);
+      onSetSelected(new Set());
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not restrict benches.");
+    }
+  }
+
+  async function batchUnrestrict() {
+    const ids = benches
+      .filter((b) => selectedIds.has(b.id) && b.restricted)
+      .map((b) => b.id);
+    if (ids.length === 0) return;
+    const res = await adminBatchUnrestrictBenches(ids);
+    setBatchUnrestrictOpen(false);
+    if (res.ok) {
+      toast.success(
+        `Unrestricted ${ids.length} bench${ids.length === 1 ? "" : "es"}.`,
+      );
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not unrestrict benches.");
+    }
+  }
+
   return (
     <Panel
       title="Bench management"
-      description="Add new benches to the program or remove benches that are no longer available for adoption."
+      description="Add, restrict, or remove benches from the program."
     >
-      <form onSubmit={add} className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+      {/* Add form */}
+      <form
+        onSubmit={add}
+        className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end"
+      >
         <label className="flex flex-col gap-1 sm:w-28">
           <span className="text-xs font-semibold text-park-ink">Code</span>
           <Input
@@ -288,40 +585,244 @@ function BenchManagement({ benches }: { benches: Bench[] }) {
         </button>
       </form>
 
-      <Input
-        placeholder="Search benches by code"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="mb-3 bg-park-bg/50"
-      />
-      <div className="max-h-64 overflow-auto rounded-xl border border-park-border">
-        {filtered.slice(0, 50).map((b) => (
-          <div
-            key={b.id}
-            className="flex items-center justify-between gap-3 border-b border-park-border px-4 py-2.5 last:border-b-0"
-          >
-            <span className="font-semibold text-park-ink">Bench {b.code}</span>
-            <span className="hidden text-sm text-park-muted sm:block">
-              {b.description ?? REGION_LABEL[b.region]}
-            </span>
-            <DeleteButton onClick={() => setTarget(b)} />
+      {/* Search + filter + batch actions */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Search benches by code"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="h-9 w-44 bg-park-bg/50"
+        />
+        <label className="flex items-center gap-1.5 text-xs text-park-muted cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showSelectedOnly}
+            onChange={(e) => setShowSelectedOnly(e.target.checked)}
+            className="size-3.5 accent-park-green"
+          />
+          Show selected ({selectedIds.size})
+        </label>
+        {selectedIds.size > 0 && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {selectedUnrestrictedCount > 0 && (
+              <button
+                onClick={() => setBatchRestrictOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/20"
+              >
+                <Lock className="size-3.5" />
+                Restrict {selectedUnrestrictedCount}
+              </button>
+            )}
+            {selectedRestrictedCount > 0 && (
+              <button
+                onClick={() => setBatchUnrestrictOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-park-green/10 px-3 py-1.5 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
+              >
+                <Unlock className="size-3.5" />
+                Unrestrict {selectedRestrictedCount}
+              </button>
+            )}
+            <button
+              onClick={() => setBatchDeleteOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-destructive/90"
+            >
+              <Trash2 className="size-3.5" />
+              Delete {selectedIds.size}
+            </button>
           </div>
-        ))}
-        {filtered.length > 50 && (
-          <p className="px-4 py-2 text-xs text-park-muted">
-            Showing first 50 of {filtered.length}. Refine your search.
-          </p>
         )}
       </div>
 
+      {/* Single-bench edit panel */}
+      {singleSelected && editingBenchId !== singleSelected.id && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-park-border bg-park-surface p-3">
+          <span className="text-sm font-bold text-park-ink">
+            Bench {singleSelected.code}
+          </span>
+          <span className="text-xs text-park-muted">
+            {REGION_LABEL[singleSelected.region]}
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => {
+                setEditingBenchId(singleSelected.id);
+                setEditCode(singleSelected.code);
+                setEditRegion(singleSelected.region);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md bg-park-green/10 px-3 py-1.5 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
+            >
+              <Pencil className="size-3.5" />
+              Edit
+            </button>
+            <button
+              onClick={() => onStartMove(singleSelected.id)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-park-green/10 px-3 py-1.5 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
+            >
+              <Move className="size-3.5" />
+              Move
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Inline edit form */}
+      {singleSelected && editingBenchId === singleSelected.id && (
+        <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3">
+          <p className="mb-2 text-sm font-bold text-park-ink">
+            Edit — Bench {singleSelected.code}
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-park-ink">Code</span>
+              <Input
+                value={editCode}
+                onChange={(e) => setEditCode(e.target.value)}
+                className="h-8 w-24 bg-white"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-park-ink">Region</span>
+              <select
+                value={editRegion}
+                onChange={(e) => setEditRegion(e.target.value as Region)}
+                className="h-8 rounded-md border border-park-border bg-white px-2 text-sm"
+              >
+                {REGIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {REGION_LABEL[r]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              onClick={async () => {
+                setEditSaving(true);
+                await onEditBench(singleSelected.id, {
+                  code: editCode,
+                  region: editRegion,
+                });
+                setEditSaving(false);
+                setEditingBenchId(null);
+              }}
+              disabled={editSaving}
+              className="h-8 rounded-md bg-park-green px-4 text-xs font-bold text-white hover:bg-park-green/90 disabled:opacity-60"
+            >
+              {editSaving ? "Saving…" : "Save"}
+            </button>
+            <button
+              onClick={() => setEditingBenchId(null)}
+              className="h-8 rounded-md border border-park-border px-4 text-xs font-bold text-park-muted hover:bg-park-sage/30"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bench list with checkboxes */}
+      <div className="max-h-72 overflow-auto rounded-xl border border-park-border">
+        {filtered.length === 0 ? (
+          <p className="p-4 text-sm text-park-muted">No benches found.</p>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 border-b border-park-border bg-park-sage/30 px-4 py-2">
+              <input
+                type="checkbox"
+                checked={allFilteredSelected}
+                onChange={toggleAll}
+                className="size-4 accent-park-green"
+              />
+              <span className="flex-1 text-xs font-semibold text-park-muted">
+                Select all ({filtered.length})
+              </span>
+              <select
+                value={regionFilter}
+                onChange={(e) => setRegionFilter(e.target.value as Region | "all")}
+                className="hidden h-7 rounded-md border border-park-border bg-park-bg/50 px-2 text-xs text-park-muted sm:block"
+              >
+                <option value="all">All regions</option>
+                {REGIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {REGION_LABEL[r]}
+                  </option>
+                ))}
+              </select>
+              <span className="hidden w-[68px] sm:block" />
+            </div>
+            {filtered.slice(0, 80).map((b) => (
+              <div
+                key={b.id}
+                className={cn(
+                  "flex items-center gap-3 border-b border-park-border px-4 py-2.5 last:border-b-0",
+                  selectedIds.has(b.id) && "bg-amber-50/50",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(b.id)}
+                  onChange={() => onToggleSelect(b.id, true)}
+                  className="size-4 shrink-0 accent-park-green"
+                />
+                <div className="min-w-0 flex-1">
+                  <span className="font-semibold text-park-ink">
+                    Bench {b.code}
+                  </span>
+                  {b.restricted && (
+                    <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive">
+                      Restricted
+                    </span>
+                  )}
+                </div>
+                <span className="hidden text-sm text-park-muted sm:block">
+                  {REGION_LABEL[b.region]}
+                </span>
+                <DeleteButton onClick={() => setDeleteTarget(b)} />
+              </div>
+            ))}
+            {filtered.length > 80 && (
+              <p className="px-4 py-2 text-xs text-park-muted">
+                Showing first 80 of {filtered.length}. Refine your search.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Dialogs */}
       <ConfirmDialog
-        open={Boolean(target)}
-        onOpenChange={(o) => !o && setTarget(null)}
-        title={`Remove bench ${target?.code ?? ""}?`}
+        open={Boolean(deleteTarget)}
+        onOpenChange={(o) => !o && setDeleteTarget(null)}
+        title={`Remove bench ${deleteTarget?.code ?? ""}?`}
         description="The bench will no longer be available for adoption. Existing reservations are removed too."
         confirmLabel="Remove bench"
         destructive
-        onConfirm={remove}
+        onConfirm={removeSingle}
+      />
+      <ConfirmDialog
+        open={batchDeleteOpen}
+        onOpenChange={(o) => !o && setBatchDeleteOpen(false)}
+        title={`Delete ${selectedIds.size} bench${selectedIds.size === 1 ? "" : "es"}?`}
+        description="This permanently removes the selected benches and their reservations."
+        confirmLabel={`Delete ${selectedIds.size} bench${selectedIds.size === 1 ? "" : "es"}`}
+        destructive
+        onConfirm={batchDelete}
+      />
+      <ConfirmDialog
+        open={batchRestrictOpen}
+        onOpenChange={(o) => !o && setBatchRestrictOpen(false)}
+        title={`Restrict ${selectedUnrestrictedCount} bench${selectedUnrestrictedCount === 1 ? "" : "es"}?`}
+        description="Restricted benches will appear as unavailable to the public."
+        confirmLabel={`Restrict ${selectedUnrestrictedCount} bench${selectedUnrestrictedCount === 1 ? "" : "es"}`}
+        destructive
+        onConfirm={batchRestrict}
+      />
+      <ConfirmDialog
+        open={batchUnrestrictOpen}
+        onOpenChange={(o) => !o && setBatchUnrestrictOpen(false)}
+        title={`Unrestrict ${selectedRestrictedCount} bench${selectedRestrictedCount === 1 ? "" : "es"}?`}
+        description="These benches will become available for adoption again."
+        confirmLabel={`Unrestrict ${selectedRestrictedCount} bench${selectedRestrictedCount === 1 ? "" : "es"}`}
+        onConfirm={batchUnrestrict}
       />
     </Panel>
   );
@@ -341,8 +842,10 @@ function ReservationManagement({
   const [userQ, setUserQ] = React.useState("");
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
 
-  const [deleteTarget, setDeleteTarget] = React.useState<AdminReservationRow | null>(null);
-  const [cancelTarget, setCancelTarget] = React.useState<AdminReservationRow | null>(null);
+  const [deleteTarget, setDeleteTarget] =
+    React.useState<AdminReservationRow | null>(null);
+  const [cancelTarget, setCancelTarget] =
+    React.useState<AdminReservationRow | null>(null);
   const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
   const [batchCancelOpen, setBatchCancelOpen] = React.useState(false);
   const [batchDeleting, setBatchDeleting] = React.useState(false);
@@ -424,7 +927,9 @@ function ReservationManagement({
     setBatchDeleting(false);
     setBatchDeleteOpen(false);
     if (res.ok) {
-      toast.success(`Deleted ${res.deletedCount} reservation${res.deletedCount === 1 ? "" : "s"}.`);
+      toast.success(
+        `Deleted ${res.deletedCount} reservation${res.deletedCount === 1 ? "" : "s"}.`,
+      );
       setSelected(new Set());
       router.refresh();
     } else {
@@ -442,7 +947,9 @@ function ReservationManagement({
     setBatchCancelling(false);
     setBatchCancelOpen(false);
     if (res.ok) {
-      toast.success(`Cancelled ${res.cancelledCount} reservation${res.cancelledCount === 1 ? "" : "s"}.`);
+      toast.success(
+        `Cancelled ${res.cancelledCount} reservation${res.cancelledCount === 1 ? "" : "s"}.`,
+      );
       router.refresh();
     } else {
       toast.error(res.error ?? "Could not cancel reservations.");
@@ -538,7 +1045,8 @@ function ReservationManagement({
                     </span>
                   </p>
                   <p className="truncate text-sm text-park-muted">
-                    {r.username} · {formatRangeCompact(r.start_month, r.end_month)}
+                    {r.username} ·{" "}
+                    {formatRangeCompact(r.start_month, r.end_month)}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -562,7 +1070,6 @@ function ReservationManagement({
         destructive
         onConfirm={removeSingle}
       />
-
       <ConfirmDialog
         open={Boolean(cancelTarget)}
         onOpenChange={(o) => !o && setCancelTarget(null)}
@@ -572,23 +1079,29 @@ function ReservationManagement({
         destructive
         onConfirm={cancelSingle}
       />
-
       <ConfirmDialog
         open={batchDeleteOpen}
         onOpenChange={(o) => !o && setBatchDeleteOpen(false)}
         title={`Delete ${selected.size} reservation${selected.size === 1 ? "" : "s"}?`}
         description="This hard-deletes all selected reservations. This cannot be undone."
-        confirmLabel={batchDeleting ? "Deleting…" : `Delete ${selected.size} reservation${selected.size === 1 ? "" : "s"}`}
+        confirmLabel={
+          batchDeleting
+            ? "Deleting…"
+            : `Delete ${selected.size} reservation${selected.size === 1 ? "" : "s"}`
+        }
         destructive
         onConfirm={batchRemove}
       />
-
       <ConfirmDialog
         open={batchCancelOpen}
         onOpenChange={(o) => !o && setBatchCancelOpen(false)}
         title={`Cancel ${selectedActiveCount} active reservation${selectedActiveCount === 1 ? "" : "s"}?`}
         description="This marks the selected active reservations as cancelled. Their benches will become available for others."
-        confirmLabel={batchCancelling ? "Cancelling…" : `Cancel ${selectedActiveCount} reservation${selectedActiveCount === 1 ? "" : "s"}`}
+        confirmLabel={
+          batchCancelling
+            ? "Cancelling…"
+            : `Cancel ${selectedActiveCount} reservation${selectedActiveCount === 1 ? "" : "s"}`
+        }
         destructive
         onConfirm={batchCancel}
       />
@@ -634,8 +1147,7 @@ function CreateReservationPanel({
         .slice(0, 5)
     : [];
 
-  const count =
-    start && end ? monthIndex(end) - monthIndex(start) + 1 : 0;
+  const count = start && end ? monthIndex(end) - monthIndex(start) + 1 : 0;
   const validRange = count >= 1 && count <= 12;
 
   async function submit(e: React.FormEvent) {
@@ -673,7 +1185,9 @@ function CreateReservationPanel({
 
   return (
     <section className="h-fit rounded-2xl border border-park-border bg-park-surface p-5">
-      <h2 className="text-lg font-bold text-park-green">Create a reservation</h2>
+      <h2 className="text-lg font-bold text-park-green">
+        Create a reservation
+      </h2>
       <p className="mb-4 mt-0.5 text-sm text-park-muted">
         Link a reservation to an existing donor account.
       </p>
@@ -722,7 +1236,9 @@ function CreateReservationPanel({
         />
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-park-ink">Start month</span>
+          <span className="text-xs font-semibold text-park-ink">
+            Start month
+          </span>
           <MonthSelect value={start} onChange={setStart} options={monthOptions} />
         </label>
         <label className="flex flex-col gap-1">

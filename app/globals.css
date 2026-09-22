@@ -77,3 +77,8 @@
     font-family: var(--font-lora), Georgia, serif;
   }
 }
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 500 !important;
+}

@@ -197,6 +197,100 @@ export async function adminDeleteBench(benchId: string): Promise<AdminResult> {
   return { ok: true };
 }
 
+/** Batch-delete multiple benches. */
+export async function adminBatchDeleteBenches(
+  benchIds: string[],
+): Promise<AdminResult & { deletedCount?: number }> {
+  await requireAdmin();
+  if (benchIds.length === 0) return { ok: true, deletedCount: 0 };
+  const supabase = await createClient();
+  const { error, count } = await supabase
+    .from("benches")
+    .delete({ count: "exact" })
+    .in("id", benchIds);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/admin");
+  revalidatePath("/reservation");
+  revalidatePath("/");
+  return { ok: true, deletedCount: count ?? benchIds.length };
+}
+
+/** Mark benches as restricted (shows "unavailable" publicly). */
+export async function adminBatchRestrictBenches(
+  benchIds: string[],
+): Promise<AdminResult> {
+  await requireAdmin();
+  if (benchIds.length === 0) return { ok: true };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("benches")
+    .update({ restricted: true })
+    .in("id", benchIds);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/admin");
+  revalidatePath("/reservation");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Remove restriction from benches. */
+export async function adminBatchUnrestrictBenches(
+  benchIds: string[],
+): Promise<AdminResult> {
+  await requireAdmin();
+  if (benchIds.length === 0) return { ok: true };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("benches")
+    .update({ restricted: false })
+    .in("id", benchIds);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/admin");
+  revalidatePath("/reservation");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+/** Update a bench's coordinates. */
+export async function adminUpdateBench(
+  benchId: string,
+  updates: { code?: string; region?: Region },
+): Promise<AdminResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const patch: Record<string, unknown> = {};
+  if (updates.code !== undefined) patch.code = updates.code.toUpperCase();
+  if (updates.region !== undefined) patch.region = updates.region;
+  if (Object.keys(patch).length === 0) return { ok: true };
+  const { error } = await supabase
+    .from("benches")
+    .update(patch)
+    .eq("id", benchId);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/admin");
+  revalidatePath("/reservation");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function adminUpdateBenchCoordinates(
+  benchId: string,
+  latitude: number,
+  longitude: number,
+): Promise<AdminResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("benches")
+    .update({ x_pct: longitude, y_pct: latitude })
+    .eq("id", benchId);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/admin");
+  revalidatePath("/reservation");
+  revalidatePath("/");
+  return { ok: true };
+}
+
 const DEFAULT_LNG = -73.8867;
 
 function defaultBandLat(region: Region): number {

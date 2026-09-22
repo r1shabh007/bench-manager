@@ -9,9 +9,16 @@ export { sortByCode };
 /** All benches, ordered by region then numeric code. */
 export async function getBenches(): Promise<Bench[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("benches")
-    .select("id, code, region, x_pct, y_pct, description");
+    .select("id, code, region, x_pct, y_pct, description, restricted");
+  if (error) {
+    const fallback = await supabase
+      .from("benches")
+      .select("id, code, region, x_pct, y_pct, description");
+    data = fallback.data as any;
+    error = fallback.error;
+  }
   if (error) {
     console.warn("[getBenches] using placeholder benches:", error.message);
     return generatePlaceholderBenches();
@@ -27,6 +34,7 @@ export async function getBenches(): Promise<Bench[]> {
       longitude: isLegacy ? pctToLng(xVal) : xVal,
       latitude: isLegacy ? pctToLat(yVal) : yVal,
       description: b.description,
+      restricted: Boolean((b as any).restricted),
     };
   });
   if (benches.length === 0) return generatePlaceholderBenches();

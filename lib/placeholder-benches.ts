@@ -31,6 +31,7 @@ function pushBand(
       longitude: round6(LNG_MIN + ((g * 61) % 880) / 880 * (LNG_MAX - LNG_MIN)),
       latitude: round6(latMin + ((g * 37) % 260) / 260 * (latMax - latMin)),
       description: null,
+      restricted: false,
     });
   }
 }

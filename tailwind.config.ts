@@ -32,7 +32,7 @@ export default {
         // Bench dot colors are REQUIRED by the spec (§5.2).
         bench: {
           available: "#B85C5C",
-          unavailable: "#9CA3AF",
+          unavailable: "#6b7280",
           selected: "#FFD60A",
         },
         // Calendar month-block colors from Figma.

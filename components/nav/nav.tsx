@@ -31,7 +31,7 @@ export function Nav({ user }: { user: SessionUser | null }) {
   if (user?.isAdmin) links.push({ href: "/admin", label: "Admin" });
 
   return (
-    <header className="sticky top-0 z-40 flex h-[76px] w-full items-center justify-between border-b border-park-border bg-park-surface px-5 sm:px-14">
+    <header className="sticky top-0 z-[1000] flex h-[76px] w-full items-center justify-between border-b border-park-border bg-park-surface px-5 sm:px-14">
       <Link href="/" className="flex items-center gap-2.5">
         <img
           src="/brand/tree-deciduous.svg"

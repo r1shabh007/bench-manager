@@ -20,9 +20,9 @@ const ATTRIBUTION =
   '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 const DOT_COLORS: Record<DotState, string> = {
-  available: "#22c55e",
-  unavailable: "#dc2626",
-  selected: "#f59e0b",
+  available: "#B85C5C",
+  unavailable: "#6b7280",
+  selected: "#FFD60A",
 };
 
 const BOUNDS_SW: [number, number] = [40.8700, -73.9150];

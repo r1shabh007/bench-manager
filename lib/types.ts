@@ -17,6 +17,7 @@ export interface Bench {
   longitude: number;
   latitude: number;
   description: string | null;
+  restricted: boolean;
 }
 
 export interface SessionUser {

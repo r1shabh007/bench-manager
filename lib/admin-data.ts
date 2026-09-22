@@ -62,9 +62,15 @@ export async function getAllReservations(): Promise<AdminReservationRow[]> {
 
 export async function getAdminBenches(): Promise<Bench[]> {
   const supabase = await createClient();
-  const { data } = await supabase
+  let { data } = await supabase
     .from("benches")
-    .select("id, code, region, x_pct, y_pct, description");
+    .select("id, code, region, x_pct, y_pct, description, restricted");
+  if (!data) {
+    const fallback = await supabase
+      .from("benches")
+      .select("id, code, region, x_pct, y_pct, description");
+    data = fallback.data as any;
+  }
   return ((data ?? []) as (Omit<Bench, "longitude" | "latitude"> & { x_pct: number; y_pct: number })[])
     .map((b) => {
       const xVal = Number(b.x_pct);
@@ -77,6 +83,7 @@ export async function getAdminBenches(): Promise<Bench[]> {
         longitude: isLegacy ? pctToLng(xVal) : xVal,
         latitude: isLegacy ? pctToLat(yVal) : yVal,
         description: b.description,
+        restricted: Boolean((b as any).restricted),
       };
     })
     .sort(sortByCode);

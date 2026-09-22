@@ -100,7 +100,7 @@ export function ReserveBar({
         disabled={!enabled}
         onClick={startReserve}
         className={cn(
-          "inline-flex h-11 items-center justify-center rounded-md px-5 text-sm font-bold transition-colors",
+          "inline-flex h-14 items-center justify-center rounded-md px-8 text-base font-bold transition-colors",
           enabled
             ? "bg-park-green text-white hover:bg-park-green/90"
             : "cursor-not-allowed bg-park-border/70 text-park-muted",

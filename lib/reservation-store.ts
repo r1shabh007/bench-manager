@@ -84,21 +84,27 @@ export function createReservationStore(init: ReservationInit) {
 
     selectBench: (id) => {
       const state = get();
-      // Clicking the selected bench deselects it.
       if (state.selectedBenchId === id) {
         set({ selectedBenchId: null });
         return;
       }
+      const bench = state.benches.find((b) => b.id === id);
+      if (bench?.restricted) {
+        set({
+          selectedBenchId: id,
+          selectedMonths: [],
+          notice: `Bench ${bench.code} is currently unavailable.`,
+        });
+        return;
+      }
       const booked = state.bookedByBench.get(id) ?? new Set<Month>();
-      // If the bench is unavailable for the current month selection, reset the
-      // months so the calendar shows this bench's own availability.
       const availableForSelection = isBenchAvailable(
         booked,
         state.selectedMonths,
         state.bookableWindow,
       );
       if (state.selectedMonths.length > 0 && !availableForSelection) {
-        const code = state.benches.find((b) => b.id === id)?.code ?? "";
+        const code = bench?.code ?? "";
         set({
           selectedBenchId: id,
           selectedMonths: [],
@@ -111,7 +117,10 @@ export function createReservationStore(init: ReservationInit) {
 
     toggleMonth: (month) => {
       const state = get();
-      // Gray months: past, plus (if a bench is selected) that bench's booked months.
+      if (state.selectedBenchId) {
+        const bench = state.benches.find((b) => b.id === state.selectedBenchId);
+        if (bench?.restricted) return;
+      }
       const unavailable = new Set<Month>();
       for (const m of state.windowMonths) {
         if (isPast(m, state.currentMonth)) unavailable.add(m);
@@ -166,6 +175,8 @@ export function benchAvailability(
   state: ReservationState,
   benchId: string,
 ): boolean {
+  const bench = state.benches.find((b) => b.id === benchId);
+  if (bench?.restricted) return false;
   const booked = state.bookedByBench.get(benchId) ?? new Set<Month>();
   return isBenchAvailable(booked, state.selectedMonths, state.bookableWindow);
 }
@@ -178,6 +189,8 @@ export function benchDot(state: ReservationState, benchId: string): DotState {
 export function monthState(state: ReservationState, month: Month): CalendarState {
   if (isPast(month, state.currentMonth)) return "unavailable";
   if (state.selectedBenchId) {
+    const bench = state.benches.find((b) => b.id === state.selectedBenchId);
+    if (bench?.restricted) return "unavailable";
     const booked = state.bookedByBench.get(state.selectedBenchId);
     if (booked?.has(month)) return "unavailable";
   }

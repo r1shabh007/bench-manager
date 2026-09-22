@@ -23,14 +23,11 @@ export function ReservationView({
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 sm:px-14">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <p className="text-xs font-bold uppercase tracking-wide text-park-rust">
-            Bench adoption
-          </p>
-          <h1 className="font-serif text-4xl text-park-green">Reserve a bench</h1>
-        </div>
-        <ReserveBar isLoggedIn={isLoggedIn} hasActiveReservation={hasActiveReservation} />
+      <div className="flex flex-col gap-1">
+        <p className="text-xs font-bold uppercase tracking-wide text-park-rust">
+          Bench adoption
+        </p>
+        <h1 className="font-serif text-4xl text-park-green">Reserve a bench</h1>
       </div>
 
       {hasActiveReservation && (
@@ -44,9 +41,12 @@ export function ReservationView({
         </div>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6 flex flex-wrap items-end gap-3">
         <ViewToggle />
         <RegionFilter />
+        <div className="ml-auto">
+          <ReserveBar isLoggedIn={isLoggedIn} hasActiveReservation={hasActiveReservation} />
+        </div>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
