@@ -159,8 +159,8 @@ export async function adminAddBench(input: {
   code: string;
   region: Region;
   description?: string;
-  xPct?: number;
-  yPct?: number;
+  longitude?: number;
+  latitude?: number;
 }): Promise<AdminResult> {
   await requireAdmin();
   const code = input.code.trim().toUpperCase();
@@ -170,8 +170,8 @@ export async function adminAddBench(input: {
     code,
     region: input.region,
     description: input.description?.trim() || null,
-    x_pct: input.xPct ?? 50,
-    y_pct: input.yPct ?? defaultBandY(input.region),
+    x_pct: input.longitude ?? DEFAULT_LNG,
+    y_pct: input.latitude ?? defaultBandLat(input.region),
   });
   if (error) {
     const msg = error.message.includes("benches_code_key")
@@ -197,8 +197,10 @@ export async function adminDeleteBench(benchId: string): Promise<AdminResult> {
   return { ok: true };
 }
 
-function defaultBandY(region: Region): number {
-  if (region === "north") return 19;
-  if (region === "central") return 49;
-  return 79;
+const DEFAULT_LNG = -73.8867;
+
+function defaultBandLat(region: Region): number {
+  if (region === "north") return 40.9050;
+  if (region === "central") return 40.8960;
+  return 40.8870;
 }

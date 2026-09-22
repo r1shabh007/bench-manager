@@ -34,8 +34,8 @@ export const BenchDot = React.memo(function BenchDot({
         : "bg-bench-unavailable";
 
   const style: React.CSSProperties = {
-    left: `${bench.x_pct}%`,
-    top: `${bench.y_pct}%`,
+    left: `${bench.longitude}%`,
+    top: `${bench.latitude}%`,
     width: 11,
     height: 11,
   };

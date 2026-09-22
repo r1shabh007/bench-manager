@@ -14,8 +14,8 @@ export interface Bench {
   id: string;
   code: string;
   region: Region;
-  x_pct: number;
-  y_pct: number;
+  longitude: number;
+  latitude: number;
   description: string | null;
 }
 

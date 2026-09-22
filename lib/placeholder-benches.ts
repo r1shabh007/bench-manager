@@ -2,23 +2,25 @@ import type { Bench, Region } from "./types";
 
 /**
  * Deterministic placeholder benches used when the database hasn't been seeded
- * yet. Matches `supabase/seed.sql` (north/central/south bands, ~510 benches).
- *
- * TODO(spec): replace with real bench coordinates from the park survey.
+ * yet. Scatters ~510 benches across Van Cortlandt Park's three regions.
  */
 export function generatePlaceholderBenches(): Bench[] {
   const benches: Bench[] = [];
-  pushBand(benches, "N", "north", 6, 170);
-  pushBand(benches, "C", "central", 36, 170);
-  pushBand(benches, "S", "south", 66, 170);
+  pushBand(benches, "N", "north", 40.9020, 40.9120, 170);
+  pushBand(benches, "C", "central", 40.8920, 40.9020, 170);
+  pushBand(benches, "S", "south", 40.8830, 40.8920, 170);
   return benches;
 }
+
+const LNG_MIN = -73.9020;
+const LNG_MAX = -73.8720;
 
 function pushBand(
   out: Bench[],
   prefix: string,
   region: Region,
-  yBase: number,
+  latMin: number,
+  latMax: number,
   count: number,
 ) {
   for (let g = 1; g <= count; g++) {
@@ -26,13 +28,13 @@ function pushBand(
       id: `placeholder-${prefix}${g}`,
       code: `${prefix}${g}`,
       region,
-      x_pct: round3(6 + ((g * 61) % 880) / 10),
-      y_pct: round3(yBase + ((g * 37) % 260) / 10),
+      longitude: round6(LNG_MIN + ((g * 61) % 880) / 880 * (LNG_MAX - LNG_MIN)),
+      latitude: round6(latMin + ((g * 37) % 260) / 260 * (latMax - latMin)),
       description: null,
     });
   }
 }
 
-function round3(n: number): number {
-  return Math.round(n * 1000) / 1000;
+function round6(n: number): number {
+  return Math.round(n * 1000000) / 1000000;
 }
