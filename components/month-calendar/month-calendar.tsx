@@ -81,7 +81,7 @@ function MonthBlock({
       onClick={onClick}
       aria-pressed={state === "selected"}
       className={cn(
-        "flex h-12 items-center justify-center rounded-md border text-sm transition-colors",
+        "flex h-12 items-center justify-center rounded-lg border text-sm transition-colors",
         state === "available" &&
           "border-park-border bg-park-surface font-medium text-park-ink hover:border-park-green",
         state === "selected" &&

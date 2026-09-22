@@ -2,19 +2,11 @@
 
 import { cn } from "@/lib/utils";
 import { loginWithUsername } from "@/app/actions/auth";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 export function LoginForm({
   className,
@@ -47,62 +39,64 @@ export function LoginForm({
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>
+      <div className="rounded-2xl border border-park-border bg-park-surface p-6 shadow-sm">
+        <div className="mb-5 flex flex-col gap-1">
+          <h1 className="font-serif text-2xl text-park-green">Welcome back</h1>
+          <p className="text-sm text-park-muted">
             Enter your username below to login to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin}>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="admin"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
+          </p>
+        </div>
+        <form onSubmit={handleLogin}>
+          <div className="flex flex-col gap-4">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-semibold text-park-ink">Username</span>
+              <Input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="h-11 rounded-lg bg-park-bg"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <div className="flex items-center">
+                <span className="text-sm font-semibold text-park-ink">Password</span>
+                <Link
+                  href="/auth/forgot-password"
+                  className="ml-auto text-xs font-medium text-park-green hover:underline"
+                >
+                  Forgot your password?
+                </Link>
               </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
-              </Button>
-            </div>
-            <div className="mt-4 text-center text-sm">
-              Don&apos;t have an account?{" "}
-              <Link
-                href="/auth/sign-up"
-                className="underline underline-offset-4"
-              >
-                Sign up
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              <Input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-11 rounded-lg bg-park-bg"
+              />
+            </label>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-park-green text-sm font-bold text-white transition-colors hover:bg-park-green/90 disabled:opacity-60"
+            >
+              {isLoading && <Loader2 className="size-4 animate-spin" />}
+              {isLoading ? "Logging in…" : "Login"}
+            </button>
+          </div>
+          <p className="mt-4 text-center text-sm text-park-muted">
+            Don&apos;t have an account?{" "}
+            <Link
+              href="/auth/sign-up"
+              className="font-semibold text-park-green hover:underline"
+            >
+              Sign up
+            </Link>
+          </p>
+        </form>
+      </div>
     </div>
   );
 }

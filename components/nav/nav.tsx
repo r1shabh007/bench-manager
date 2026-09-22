@@ -79,7 +79,7 @@ export function Nav({ user }: { user: SessionUser | null }) {
             <button
               onClick={handleLogout}
               disabled={loggingOut}
-              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-md border border-park-green px-4 text-sm font-bold text-park-green transition-colors hover:bg-park-sage/50 disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full border border-park-green px-4 text-sm font-bold text-park-green transition-colors hover:bg-park-sage/50 disabled:opacity-60"
             >
               <LogOut className="size-4" />
               <span className="hidden sm:inline">Log out</span>
@@ -88,7 +88,7 @@ export function Nav({ user }: { user: SessionUser | null }) {
         ) : (
           <button
             onClick={() => open({ tab: "login" })}
-            className="inline-flex h-11 items-center justify-center rounded-md bg-park-green px-[18px] text-sm font-bold text-white transition-colors hover:bg-park-green/90"
+            className="inline-flex h-11 items-center justify-center rounded-full bg-park-green px-5 text-sm font-bold text-white transition-colors hover:bg-park-green/90"
           >
             Login / Sign Up
           </button>

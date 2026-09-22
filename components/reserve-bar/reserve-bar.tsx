@@ -100,7 +100,7 @@ export function ReserveBar({
         disabled={!enabled}
         onClick={startReserve}
         className={cn(
-          "inline-flex h-14 items-center justify-center rounded-md px-8 text-base font-bold transition-colors",
+          "inline-flex h-14 items-center justify-center rounded-full px-8 text-base font-bold transition-colors",
           enabled
             ? "bg-park-green text-white hover:bg-park-green/90"
             : "cursor-not-allowed bg-park-border/70 text-park-muted",
@@ -127,13 +127,13 @@ export function ReserveBar({
                 <Link
                   href="/account"
                   onClick={closeConfirm}
-                  className="inline-flex h-11 items-center justify-center rounded-md bg-park-green px-5 text-sm font-bold text-white hover:bg-park-green/90"
+                  className="inline-flex h-11 items-center justify-center rounded-full bg-park-green px-5 text-sm font-bold text-white hover:bg-park-green/90"
                 >
                   Go to account
                 </Link>
                 <button
                   onClick={closeConfirm}
-                  className="inline-flex h-11 items-center justify-center rounded-md border border-park-border px-5 text-sm font-semibold text-park-green hover:bg-park-sage/50"
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-park-border px-5 text-sm font-semibold text-park-green hover:bg-park-sage/50"
                 >
                   Keep browsing
                 </button>
@@ -156,14 +156,14 @@ export function ReserveBar({
               <DialogFooter>
                 <button
                   onClick={closeConfirm}
-                  className="inline-flex h-11 items-center justify-center rounded-md border border-park-border px-5 text-sm font-semibold text-park-green hover:bg-park-sage/50"
+                  className="inline-flex h-11 items-center justify-center rounded-full border border-park-border px-5 text-sm font-semibold text-park-green hover:bg-park-sage/50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirm}
                   disabled={submitting}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-park-green px-5 text-sm font-bold text-white hover:bg-park-green/90 disabled:opacity-60"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-park-green px-5 text-sm font-bold text-white hover:bg-park-green/90 disabled:opacity-60"
                 >
                   {submitting && <Loader2 className="size-4 animate-spin" />}
                   Confirm

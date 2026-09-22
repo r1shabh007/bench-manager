@@ -31,7 +31,7 @@ export function ReservationView({
       </div>
 
       {hasActiveReservation && (
-        <div className="mt-4 rounded-lg border border-park-rust/30 bg-park-rust/5 px-4 py-3 text-sm text-park-rust">
+        <div className="mt-4 rounded-xl border border-park-rust/30 bg-park-rust/5 px-4 py-3 text-sm text-park-rust">
           You already have an active reservation. You can only reserve one bench at a time.
           Cancel your current reservation from your{" "}
           <a href="/account" className="font-semibold underline underline-offset-2">
@@ -53,7 +53,7 @@ export function ReservationView({
         <div className="flex flex-col gap-3">
           {view === "map" ? <BenchMap /> : <BenchList />}
           <MapLegend />
-          <p className="rounded-lg border border-park-border bg-park-surface px-3 py-2 text-xs text-park-muted">
+          <p className="rounded-xl border border-park-border bg-park-surface px-3 py-2 text-xs text-park-muted">
             Benches are available by default unless fully booked across {year}–
             {year + 1}. Selecting an unavailable bench resets dates to show what
             can be booked.

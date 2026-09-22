@@ -29,28 +29,28 @@ export default async function HomePage() {
       </Suspense>
 
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-park-sage/40 via-park-bg to-park-bg" />
+      <section className="relative overflow-hidden bg-park-green">
+        <div className="absolute inset-0 bg-gradient-to-br from-black/10 via-transparent to-park-sage/10" />
         <div className="relative flex flex-col items-center gap-10 px-5 py-16 sm:px-[72px] sm:py-20 lg:flex-row lg:gap-14">
           <div className="flex flex-1 flex-col items-start gap-5">
-            <p className="inline-flex items-center gap-1.5 rounded-full bg-park-green/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-park-green">
+            <p className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1 text-xs font-bold uppercase tracking-wide text-park-sage">
               <TreeDeciduous className="size-3.5" />
               Van Cortlandt Park
             </p>
-            <h1 className="font-serif text-4xl leading-[1.05] text-park-green sm:text-5xl lg:text-[3.5rem]">
+            <h1 className="font-serif text-4xl leading-[1.05] text-white sm:text-5xl lg:text-[3.5rem]">
               Adopt a bench.
               <br />
-              <span className="text-park-rust">Leave a lasting welcome.</span>
+              <span className="text-park-sage">Leave a lasting welcome.</span>
             </h1>
-            <p className="max-w-lg text-lg leading-relaxed text-park-muted">
+            <p className="max-w-lg text-lg leading-relaxed text-white/70">
               Choose from more than {availableCount} park benches and support the
               places where neighbors rest, meet, and take in the landscape.
             </p>
             <HomeCta loggedIn={!!user} />
           </div>
           <div className="relative w-full max-w-xl lg:w-[580px]">
-            <div className="absolute -inset-3 rounded-[28px] bg-park-green/10" />
-            <div className="relative aspect-[620/430] overflow-hidden rounded-[20px] shadow-xl">
+            <div className="absolute -inset-3 rounded-[28px] bg-white/5" />
+            <div className="relative aspect-[620/430] overflow-hidden rounded-[20px] shadow-2xl ring-1 ring-white/10">
               <Image
                 src="/hero-park.png"
                 alt="A bench along a wooded path in Van Cortlandt Park"
@@ -65,10 +65,10 @@ export default async function HomePage() {
       </section>
 
       {/* Highlights strip */}
-      <section className="border-y border-park-border/60 bg-park-surface">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-center gap-6 px-5 py-6 sm:flex-row sm:gap-12 sm:divide-x sm:divide-park-border/60 sm:py-5">
+      <section className="border-y border-park-green/10 bg-park-sage/40">
+        <div className="mx-auto flex max-w-5xl flex-col items-center justify-center gap-6 px-5 py-6 sm:flex-row sm:gap-12 sm:divide-x sm:divide-park-green/15 sm:py-5">
           <div className="flex items-center gap-3 sm:pr-12">
-            <div className="flex size-10 items-center justify-center rounded-full bg-park-sage">
+            <div className="flex size-10 items-center justify-center rounded-full bg-park-green/10">
               <MapPin className="size-5 text-park-green" />
             </div>
             <div>
@@ -77,7 +77,7 @@ export default async function HomePage() {
             </div>
           </div>
           <div className="flex items-center gap-3 sm:pl-12 sm:pr-12">
-            <div className="flex size-10 items-center justify-center rounded-full bg-park-sage">
+            <div className="flex size-10 items-center justify-center rounded-full bg-park-green/10">
               <Calendar className="size-5 text-park-green" />
             </div>
             <div>
@@ -86,7 +86,7 @@ export default async function HomePage() {
             </div>
           </div>
           <div className="flex items-center gap-3 sm:pl-12">
-            <div className="flex size-10 items-center justify-center rounded-full bg-park-sage">
+            <div className="flex size-10 items-center justify-center rounded-full bg-park-green/10">
               <TreeDeciduous className="size-5 text-park-green" />
             </div>
             <div>
@@ -118,9 +118,9 @@ export default async function HomePage() {
         <div className="flex justify-center pt-2">
           <Link
             href="/reservation"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-park-green transition-colors hover:text-park-rust"
+            className="inline-flex h-11 items-center gap-2 rounded-full bg-park-green px-6 text-sm font-bold text-white transition-all hover:bg-park-green/90 hover:shadow-md"
           >
-            Explore all benches and start your reservation
+            Explore all benches
             <span aria-hidden="true">&rarr;</span>
           </Link>
         </div>

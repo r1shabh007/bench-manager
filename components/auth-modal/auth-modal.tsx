@@ -55,7 +55,7 @@ export function AuthModal({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-park-sage/60 p-1">
+        <div className="grid grid-cols-2 gap-1 rounded-full bg-park-sage/60 p-1">
           <TabButton
             active={tab === "login"}
             onClick={() => {
@@ -115,7 +115,7 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-md py-2 text-sm font-semibold transition-colors",
+        "rounded-full py-2 text-sm font-semibold transition-colors",
         active
           ? "bg-park-surface text-park-green shadow-sm"
           : "text-park-muted hover:text-park-green",
@@ -328,7 +328,7 @@ function SubmitButton({
     <button
       type="submit"
       disabled={loading}
-      className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-park-green px-4 text-sm font-bold text-white transition-colors hover:bg-park-green/90 disabled:opacity-60"
+      className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-park-green px-4 text-sm font-bold text-white transition-colors hover:bg-park-green/90 disabled:opacity-60"
     >
       {loading && <Loader2 className="size-4 animate-spin" />}
       {children}

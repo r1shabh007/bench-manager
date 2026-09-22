@@ -158,7 +158,7 @@ function ReservationCard({
         <div className="mt-4 flex justify-end border-t border-park-border pt-4">
           <button
             onClick={() => setConfirmOpen(true)}
-            className="inline-flex h-11 items-center justify-center rounded-md bg-destructive px-5 text-sm font-bold text-white transition-colors hover:bg-destructive/90"
+            className="inline-flex h-11 items-center justify-center rounded-full bg-destructive px-5 text-sm font-bold text-white transition-colors hover:bg-destructive/90"
           >
             Cancel reservation
           </button>
@@ -178,14 +178,14 @@ function ReservationCard({
           <DialogFooter>
             <button
               onClick={() => setConfirmOpen(false)}
-              className="inline-flex h-11 items-center justify-center rounded-md border border-park-border px-5 text-sm font-semibold text-park-green hover:bg-park-sage/50"
+              className="inline-flex h-11 items-center justify-center rounded-full border border-park-border px-5 text-sm font-semibold text-park-green hover:bg-park-sage/50"
             >
               Keep reservation
             </button>
             <button
               onClick={cancel}
               disabled={submitting}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-destructive px-5 text-sm font-bold text-white hover:bg-destructive/90 disabled:opacity-60"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-destructive px-5 text-sm font-bold text-white hover:bg-destructive/90 disabled:opacity-60"
             >
               {submitting && <Loader2 className="size-4 animate-spin" />}
               Yes, cancel

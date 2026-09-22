@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
 import { Suspense } from "react";
 
 async function ErrorContent({
@@ -9,17 +9,11 @@ async function ErrorContent({
   const params = await searchParams;
 
   return (
-    <>
-      {params?.error ? (
-        <p className="text-sm text-muted-foreground">
-          Code error: {params.error}
-        </p>
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          An unspecified error occurred.
-        </p>
-      )}
-    </>
+    <p className="text-sm text-park-muted">
+      {params?.error
+        ? `Code error: ${params.error}`
+        : "An unspecified error occurred."}
+    </p>
   );
 }
 
@@ -31,19 +25,21 @@ export default function Page({
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
       <div className="w-full max-w-sm">
-        <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl">
-                Sorry, something went wrong.
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Suspense>
-                <ErrorContent searchParams={searchParams} />
-              </Suspense>
-            </CardContent>
-          </Card>
+        <div className="rounded-2xl border border-park-border bg-park-surface p-6 shadow-sm">
+          <h1 className="font-serif text-2xl text-park-green">
+            Sorry, something went wrong.
+          </h1>
+          <div className="mt-2">
+            <Suspense>
+              <ErrorContent searchParams={searchParams} />
+            </Suspense>
+          </div>
+          <Link
+            href="/"
+            className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-park-green px-5 text-sm font-bold text-white transition-colors hover:bg-park-green/90"
+          >
+            Back to home
+          </Link>
         </div>
       </div>
     </div>

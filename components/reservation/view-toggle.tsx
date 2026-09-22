@@ -11,7 +11,7 @@ export function ViewToggle() {
   const view = useReservationStore((s) => s.view);
 
   return (
-    <div className="inline-flex rounded-lg border border-park-border bg-park-surface p-1">
+    <div className="inline-flex rounded-full border border-park-border bg-park-surface p-1">
       <ToggleButton
         active={view === "map"}
         onClick={() => store.getState().setView("map")}
@@ -43,7 +43,7 @@ function ToggleButton({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "rounded-md px-4 py-1.5 text-sm font-semibold transition-colors",
+        "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors",
         active
           ? "bg-park-green text-white"
           : "text-park-muted hover:text-park-green",
