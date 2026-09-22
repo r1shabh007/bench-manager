@@ -158,7 +158,6 @@ export async function adminDeleteUser(userId: string): Promise<AdminResult> {
 export async function adminAddBench(input: {
   code: string;
   region: Region;
-  description?: string;
   longitude?: number;
   latitude?: number;
 }): Promise<AdminResult> {
@@ -169,7 +168,6 @@ export async function adminAddBench(input: {
   const { error } = await supabase.from("benches").insert({
     code,
     region: input.region,
-    description: input.description?.trim() || null,
     x_pct: input.longitude ?? DEFAULT_LNG,
     y_pct: input.latitude ?? defaultBandLat(input.region),
   });

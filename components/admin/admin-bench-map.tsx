@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Lock, Unlock, Trash2 } from "lucide-react";
-import type { Bench } from "@/lib/types";
+import { Lock, Unlock, Trash2, Pencil, Check, X, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { Bench, Region } from "@/lib/types";
+import { REGIONS, REGION_LABEL } from "@/lib/types";
 
 const PARK_CENTER: [number, number] = [40.8975, -73.8867];
 const MAPTILER_KEY = "IiZFrC1qx8fwNPHZYNlS";
@@ -44,11 +46,14 @@ interface AdminBenchMapProps {
   selectedIds: Set<string>;
   onToggleSelect: (id: string, multi: boolean) => void;
   onUpdateCoordinates: (id: string, lat: number, lng: number) => Promise<boolean>;
+  onDeselect: () => void;
   onBatchRestrict: (ids: string[]) => void;
   onBatchUnrestrict: (ids: string[]) => void;
   onBatchDelete: (ids: string[]) => void;
+  onUpdateBench: (id: string, updates: { code?: string; region?: Region }) => Promise<boolean>;
   externalMoveId?: string | null;
-  onClearExternalMove?: () => void;
+  onCancelExternalMove?: () => void;
+  onStartMove?: (benchId: string) => void;
 }
 
 export function AdminBenchMap({
@@ -56,16 +61,21 @@ export function AdminBenchMap({
   selectedIds,
   onToggleSelect,
   onUpdateCoordinates,
+  onUpdateBench,
+  onDeselect,
   onBatchRestrict,
   onBatchUnrestrict,
   onBatchDelete,
   externalMoveId,
-  onClearExternalMove,
+  onCancelExternalMove,
+  onStartMove: onStartMoveExternal,
 }: AdminBenchMapProps) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<any>(null);
   const markersRef = React.useRef<Map<string, any>>(new Map());
   const LRef = React.useRef<typeof import("leaflet") | null>(null);
+  const onToggleSelectRef = React.useRef(onToggleSelect);
+  onToggleSelectRef.current = onToggleSelect;
   const [ready, setReady] = React.useState(false);
   const [mode, setMode] = React.useState<MapMode>({ type: "idle" });
   const [saving, setSaving] = React.useState(false);
@@ -153,7 +163,7 @@ export function AdminBenchMap({
 
         const marker = L.marker([bench.latitude, bench.longitude], { icon });
         marker.on("click", () => {
-          onToggleSelect(bench.id, true);
+          onToggleSelectRef.current(bench.id, true);
         });
         marker.bindTooltip(bench.code, {
           direction: "top",
@@ -202,6 +212,7 @@ export function AdminBenchMap({
 
   function startMove() {
     if (!selectedBench) return;
+    onStartMoveExternal?.(selectedBench.id);
     startMoveForBench(selectedBench);
   }
 
@@ -219,12 +230,17 @@ export function AdminBenchMap({
   }
 
   React.useEffect(() => {
-    if (!externalMoveId || !ready) return;
-    const bench = benches.find((b) => b.id === externalMoveId);
-    if (bench) {
-      startMoveForBench(bench);
+    if (!externalMoveId) {
+      if (mode.type === "move") {
+        const marker = markersRef.current.get(mode.benchId);
+        if (marker) marker.setLatLng([mode.origLat, mode.origLng]);
+        setMode({ type: "idle" });
+      }
+      return;
     }
-    onClearExternalMove?.();
+    if (!ready) return;
+    const bench = benches.find((b) => b.id === externalMoveId);
+    if (bench) startMoveForBench(bench);
   }, [externalMoveId, ready]);
 
   function handleLatInput(value: string) {
@@ -262,6 +278,7 @@ export function AdminBenchMap({
     const marker = markersRef.current.get(mode.benchId);
     if (marker) marker.setLatLng([mode.origLat, mode.origLng]);
     setMode({ type: "idle" });
+    if (externalMoveId === mode.benchId) onCancelExternalMove?.();
   }
 
   return (
@@ -276,9 +293,75 @@ export function AdminBenchMap({
           className="h-[500px] w-full overflow-hidden rounded-2xl border border-park-border"
         />
         {selectedIds.size > 0 && (
-          <span className="pointer-events-none absolute right-3 top-3 z-[1000] rounded bg-white/80 px-2 py-1 text-xs font-bold text-destructive backdrop-blur-sm">
+          <span className="pointer-events-none absolute right-3 top-3 z-[500] rounded bg-white/80 px-2 py-1 text-xs font-bold text-destructive backdrop-blur-sm">
             {selectedIds.size} selected
           </span>
+        )}
+
+        {/* Selection panel — overlays bottom of map */}
+        {selectedIds.size > 0 && mode.type === "idle" && (
+          <div className="absolute bottom-3 left-3 right-3 z-[1000] rounded-xl">
+            <SelectionPanel
+              benches={benches}
+              selectedIds={selectedIds}
+              onStartMove={startMove}
+              onUpdateBench={onUpdateBench}
+              onDeselect={onDeselect}
+              onBatchRestrict={onBatchRestrict}
+              onBatchUnrestrict={onBatchUnrestrict}
+              onBatchDelete={onBatchDelete}
+            />
+          </div>
+        )}
+
+        {/* Move mode — overlays bottom of map */}
+        {mode.type === "move" && (
+          <div className="absolute bottom-3 left-3 right-3 z-[1000] rounded-xl border border-amber-300/80 bg-amber-50/85 p-3 backdrop-blur-sm">
+            <p className="mb-2 text-sm font-bold text-park-ink">
+              Move — Bench{" "}
+              {benches.find((b) => b.id === mode.benchId)?.code}
+            </p>
+            <p className="mb-2 text-xs text-park-muted">
+              Drag the dot on the map or type coordinates below.
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-park-ink">
+                  Latitude
+                </span>
+                <input
+                  type="text"
+                  value={mode.latInput}
+                  onChange={(e) => handleLatInput(e.target.value)}
+                  className="h-8 w-32 rounded-md border border-park-border bg-white px-2 font-mono text-sm"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-park-ink">
+                  Longitude
+                </span>
+                <input
+                  type="text"
+                  value={mode.lngInput}
+                  onChange={(e) => handleLngInput(e.target.value)}
+                  className="h-8 w-32 rounded-md border border-park-border bg-white px-2 font-mono text-sm"
+                />
+              </label>
+              <button
+                onClick={confirmMove}
+                disabled={saving}
+                className="h-8 rounded-md bg-park-green px-4 text-xs font-bold text-white hover:bg-park-green/90 disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Confirm"}
+              </button>
+              <button
+                onClick={cancelMove}
+                className="h-8 rounded-md border border-park-border px-4 text-xs font-bold text-park-muted hover:bg-park-sage/30"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -301,68 +384,6 @@ export function AdminBenchMap({
           Selected
         </span>
       </div>
-
-      {/* Selection panel — single or multi */}
-      {selectedIds.size > 0 && mode.type === "idle" && (
-        <SelectionPanel
-          benches={benches}
-          selectedIds={selectedIds}
-          onStartMove={startMove}
-          onBatchRestrict={onBatchRestrict}
-          onBatchUnrestrict={onBatchUnrestrict}
-          onBatchDelete={onBatchDelete}
-        />
-      )}
-
-      {/* Move mode — drag dot OR type coordinates */}
-      {mode.type === "move" && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
-          <p className="mb-2 text-sm font-bold text-park-ink">
-            Move — Bench{" "}
-            {benches.find((b) => b.id === mode.benchId)?.code}
-          </p>
-          <p className="mb-2 text-xs text-park-muted">
-            Drag the dot on the map or type coordinates below.
-          </p>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-semibold text-park-ink">
-                Latitude
-              </span>
-              <input
-                type="text"
-                value={mode.latInput}
-                onChange={(e) => handleLatInput(e.target.value)}
-                className="h-8 w-32 rounded-md border border-park-border bg-white px-2 font-mono text-sm"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-semibold text-park-ink">
-                Longitude
-              </span>
-              <input
-                type="text"
-                value={mode.lngInput}
-                onChange={(e) => handleLngInput(e.target.value)}
-                className="h-8 w-32 rounded-md border border-park-border bg-white px-2 font-mono text-sm"
-              />
-            </label>
-            <button
-              onClick={confirmMove}
-              disabled={saving}
-              className="h-8 rounded-md bg-park-green px-4 text-xs font-bold text-white hover:bg-park-green/90 disabled:opacity-60"
-            >
-              {saving ? "Saving…" : "Confirm"}
-            </button>
-            <button
-              onClick={cancelMove}
-              className="h-8 rounded-md border border-park-border px-4 text-xs font-bold text-park-muted hover:bg-park-sage/30"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -371,6 +392,8 @@ function SelectionPanel({
   benches,
   selectedIds,
   onStartMove,
+  onUpdateBench,
+  onDeselect,
   onBatchRestrict,
   onBatchUnrestrict,
   onBatchDelete,
@@ -378,6 +401,8 @@ function SelectionPanel({
   benches: Bench[];
   selectedIds: Set<string>;
   onStartMove: () => void;
+  onUpdateBench: (id: string, updates: { code?: string; region?: Region }) => Promise<boolean>;
+  onDeselect: () => void;
   onBatchRestrict: (ids: string[]) => void;
   onBatchUnrestrict: (ids: string[]) => void;
   onBatchDelete: (ids: string[]) => void;
@@ -388,71 +413,172 @@ function SelectionPanel({
   const restrictableIds = selected.filter((b) => !b.restricted).map((b) => b.id);
   const unrestrictableIds = selected.filter((b) => b.restricted).map((b) => b.id);
 
+  const [editingCode, setEditingCode] = React.useState(false);
+  const [editCode, setEditCode] = React.useState("");
+  const [editingRegion, setEditingRegion] = React.useState(false);
+  const [editRegion, setEditRegion] = React.useState<Region>("north");
+  const [editSaving, setEditSaving] = React.useState(false);
+
+  async function saveCode() {
+    if (!singleBench) return;
+    setEditSaving(true);
+    const ok = await onUpdateBench(singleBench.id, { code: editCode });
+    setEditSaving(false);
+    if (ok) setEditingCode(false);
+  }
+
+  async function saveRegion() {
+    if (!singleBench) return;
+    setEditSaving(true);
+    const ok = await onUpdateBench(singleBench.id, { region: editRegion });
+    setEditSaving(false);
+    if (ok) setEditingRegion(false);
+  }
+
   return (
-    <div className="rounded-xl border border-park-border bg-park-surface p-3">
+    <div className="rounded-xl border border-park-border/80 bg-park-surface/85 p-3 backdrop-blur-sm">
       {/* Header */}
       {singleBench ? (
         <div className="mb-2">
-          <p className="text-sm font-bold text-park-ink">
-            Bench {singleBench.code}
-          </p>
-          <p className="font-mono text-xs text-park-muted">
-            {singleBench.latitude.toFixed(6)},{" "}
-            {singleBench.longitude.toFixed(6)}
-          </p>
+          <div className="flex items-center gap-1.5">
+            {editingCode ? (
+              <>
+                <span className="text-sm text-park-muted">Bench</span>
+                <input
+                  value={editCode}
+                  onChange={(e) => setEditCode(e.target.value)}
+                  autoFocus
+                  className="h-6 w-16 rounded-md border border-park-border bg-white px-1.5 text-sm font-semibold"
+                  onKeyDown={(e) => { if (e.key === "Enter") saveCode(); if (e.key === "Escape") setEditingCode(false); }}
+                />
+                <button onClick={saveCode} disabled={editSaving} className="rounded p-0.5 text-park-green hover:bg-park-green/10 disabled:opacity-50">
+                  {editSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                </button>
+                <button onClick={() => setEditingCode(false)} disabled={editSaving} className="rounded p-0.5 text-destructive/60 hover:text-destructive disabled:opacity-50">
+                  <X className="size-3.5" />
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-park-ink">
+                  Bench {singleBench.code}
+                </p>
+                <button
+                  onClick={() => { setEditCode(singleBench.code); setEditingCode(true); setEditingRegion(false); }}
+                  className="rounded p-0.5 text-park-muted/50 hover:text-park-ink"
+                >
+                  <Pencil className="size-3" />
+                </button>
+              </>
+            )}
+            <span className="mx-1 text-park-muted">·</span>
+            {editingRegion ? (
+              <>
+                <select
+                  value={editRegion}
+                  onChange={(e) => setEditRegion(e.target.value as Region)}
+                  autoFocus
+                  className="h-6 rounded-md border border-park-border bg-white px-1 text-xs"
+                >
+                  {REGIONS.map((r) => (
+                    <option key={r} value={r}>{REGION_LABEL[r]}</option>
+                  ))}
+                </select>
+                <button onClick={saveRegion} disabled={editSaving} className="rounded p-0.5 text-park-green hover:bg-park-green/10 disabled:opacity-50">
+                  {editSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                </button>
+                <button onClick={() => setEditingRegion(false)} disabled={editSaving} className="rounded p-0.5 text-destructive/60 hover:text-destructive disabled:opacity-50">
+                  <X className="size-3.5" />
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-xs text-park-muted">{REGION_LABEL[singleBench.region]}</span>
+                <button
+                  onClick={() => { setEditRegion(singleBench.region); setEditingRegion(true); setEditingCode(false); }}
+                  className="rounded p-0.5 text-park-muted/50 hover:text-park-ink"
+                >
+                  <Pencil className="size-3" />
+                </button>
+              </>
+            )}
+          </div>
+          <div className="flex items-center">
+            <p className="font-mono text-xs text-park-muted">
+              {singleBench.latitude.toFixed(6)},{" "}
+              {singleBench.longitude.toFixed(6)}
+            </p>
+            <button
+              onClick={onDeselect}
+              className="ml-auto text-[10px] font-semibold text-park-muted hover:text-park-ink"
+            >
+              Deselect all
+            </button>
+          </div>
         </div>
       ) : (
-        <p className="mb-2 text-sm font-bold text-park-ink">
-          {selected.length} benches selected
-        </p>
+        <div className="mb-2 flex items-baseline">
+          <p className="text-sm font-bold text-park-ink">
+            {selected.length} benches selected
+          </p>
+          <span className="ml-2 text-[10px] text-park-muted">
+            — select 1 to move or edit
+          </span>
+          <button
+            onClick={onDeselect}
+            className="ml-auto text-[10px] font-semibold text-park-muted hover:text-park-ink"
+          >
+            Deselect all
+          </button>
+        </div>
       )}
 
       {/* Actions row */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2">
         {/* Move button */}
-        {multiSelect ? (
-          <div className="flex flex-col gap-0.5">
-            <button
-              disabled
-              className="inline-flex w-16 items-center justify-center rounded-md bg-park-green/5 px-3 py-1.5 text-xs font-bold text-park-muted cursor-not-allowed"
-            >
-              Move
-            </button>
-            <span className="text-[10px] text-park-muted">
-              Only 1 bench can be moved at a time. You have {selected.length} selected.
-            </span>
-          </div>
-        ) : (
-          <button
-            onClick={onStartMove}
-            className="inline-flex w-16 items-center justify-center rounded-md bg-park-green/10 px-3 py-1.5 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
-          >
-            Move
-          </button>
-        )}
+        <button
+          onClick={multiSelect ? undefined : onStartMove}
+          disabled={multiSelect}
+          className={cn(
+            "inline-flex shrink-0 items-center justify-center rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+            multiSelect
+              ? "bg-park-green/5 text-park-muted cursor-not-allowed"
+              : "bg-park-green/10 text-park-green hover:bg-park-green/20",
+          )}
+        >
+          Move
+        </button>
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {restrictableIds.length > 0 && (
-            <button
-              onClick={() => onBatchRestrict(restrictableIds)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/20"
-            >
-              <Lock className="size-3.5" />
-              Restrict{multiSelect ? ` ${restrictableIds.length}` : ""}
-            </button>
-          )}
-          {unrestrictableIds.length > 0 && (
-            <button
-              onClick={() => onBatchUnrestrict(unrestrictableIds)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-park-green/10 px-3 py-1.5 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
-            >
-              <Unlock className="size-3.5" />
-              Unrestrict{multiSelect ? ` ${unrestrictableIds.length}` : ""}
-            </button>
-          )}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => onBatchRestrict(restrictableIds)}
+            disabled={restrictableIds.length === 0}
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+              restrictableIds.length === 0
+                ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                : "bg-destructive/10 text-destructive hover:bg-destructive/20",
+            )}
+          >
+            <Lock className="size-3.5" />
+            Restrict{multiSelect ? ` ${restrictableIds.length}` : ""}
+          </button>
+          <button
+            onClick={() => onBatchUnrestrict(unrestrictableIds)}
+            disabled={unrestrictableIds.length === 0}
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+              unrestrictableIds.length === 0
+                ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                : "bg-park-green/10 text-park-green hover:bg-park-green/20",
+            )}
+          >
+            <Unlock className="size-3.5" />
+            Unrestrict{multiSelect ? ` ${unrestrictableIds.length}` : ""}
+          </button>
           <button
             onClick={() => onBatchDelete(Array.from(selectedIds))}
-            className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-destructive/90"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-destructive/90"
           >
             <Trash2 className="size-3.5" />
             Delete{multiSelect ? ` ${selected.length}` : ""}

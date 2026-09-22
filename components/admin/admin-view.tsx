@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Trash2, XCircle, Lock, Unlock, Pencil, Move } from "lucide-react";
+import { Loader2, Trash2, XCircle, X, Lock, Unlock, Pencil, Check, Move } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -58,8 +58,31 @@ export function AdminView({
     new Set(),
   );
   const [mapMoveId, setMapMoveId] = React.useState<string | null>(null);
+  const prevSelectedRef = React.useRef<Set<string>>(new Set());
+  function handleStartMove(benchId: string) {
+    prevSelectedRef.current = new Set(selectedBenchIds);
+    setSelectedBenchIds(new Set([benchId]));
+    setMapMoveId(benchId);
+  }
+
+  function handleMoveComplete() {
+    setMapMoveId(null);
+    setSelectedBenchIds(prevSelectedRef.current);
+  }
+
+  function guardedSetSelected(ids: Set<string>) {
+    if (mapMoveId) {
+      toast.show("Confirm or cancel the move first.");
+      return;
+    }
+    setSelectedBenchIds(ids);
+  }
 
   function toggleBenchSelect(id: string, multi: boolean) {
+    if (mapMoveId) {
+      toast.show("Confirm or cancel the move first.");
+      return;
+    }
     setSelectedBenchIds((prev) => {
       const next = new Set(multi ? prev : []);
       if (prev.has(id) && (multi || prev.size === 1)) {
@@ -69,24 +92,6 @@ export function AdminView({
       }
       return next;
     });
-  }
-
-  function handleStartMove(benchId: string) {
-    setSelectedBenchIds(new Set([benchId]));
-    setMapMoveId(benchId);
-  }
-
-  async function handleEditBench(
-    benchId: string,
-    updates: { code?: string; region?: Region },
-  ) {
-    const res = await adminUpdateBench(benchId, updates);
-    if (res.ok) {
-      toast.success("Bench updated.");
-      router.refresh();
-    } else {
-      toast.error(res.error ?? "Could not update bench.");
-    }
   }
 
   return (
@@ -116,19 +121,22 @@ export function AdminView({
           benches={benches}
           selectedIds={selectedBenchIds}
           onToggleSelect={toggleBenchSelect}
-          onSetSelected={setSelectedBenchIds}
+          onSetSelected={guardedSetSelected}
+          movingBenchId={mapMoveId}
           onStartMove={handleStartMove}
-          onEditBench={handleEditBench}
+          onMoveComplete={handleMoveComplete}
         />
         <AdminBenchMapSection
           benches={benches}
           selectedIds={selectedBenchIds}
           onToggleSelect={toggleBenchSelect}
-          onSetSelected={setSelectedBenchIds}
+          onSetSelected={guardedSetSelected}
           externalMoveId={mapMoveId}
-          onClearExternalMove={() => setMapMoveId(null)}
+          onStartMove={handleStartMove}
+          onMoveComplete={handleMoveComplete}
         />
       </div>
+
     </div>
   );
 }
@@ -139,20 +147,36 @@ function AdminBenchMapSection({
   onToggleSelect,
   onSetSelected,
   externalMoveId,
-  onClearExternalMove,
+  onStartMove,
+  onMoveComplete,
 }: {
   benches: Bench[];
   selectedIds: Set<string>;
   onToggleSelect: (id: string, multi: boolean) => void;
   onSetSelected: (ids: Set<string>) => void;
   externalMoveId: string | null;
-  onClearExternalMove: () => void;
+  onStartMove: (benchId: string) => void;
+  onMoveComplete: () => void;
 }) {
   const router = useRouter();
   const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
   const [batchRestrictOpen, setBatchRestrictOpen] = React.useState(false);
   const [batchUnrestrictOpen, setBatchUnrestrictOpen] = React.useState(false);
   const [pendingIds, setPendingIds] = React.useState<string[]>([]);
+
+  async function handleUpdateBench(
+    id: string,
+    updates: { code?: string; region?: Region },
+  ): Promise<boolean> {
+    const res = await adminUpdateBench(id, updates);
+    if (res.ok) {
+      toast.success("Updated.");
+      router.refresh();
+      return true;
+    }
+    toast.error(res.error ?? "Could not update bench.");
+    return false;
+  }
 
   async function handleUpdateCoordinates(
     id: string,
@@ -163,6 +187,7 @@ function AdminBenchMapSection({
     if (res.ok) {
       toast.success("Coordinates updated.");
       router.refresh();
+      if (externalMoveId === id) onMoveComplete();
       return true;
     }
     toast.error(res.error ?? "Could not update coordinates.");
@@ -214,8 +239,11 @@ function AdminBenchMapSection({
         selectedIds={selectedIds}
         onToggleSelect={onToggleSelect}
         onUpdateCoordinates={handleUpdateCoordinates}
+        onUpdateBench={handleUpdateBench}
+        onDeselect={() => onSetSelected(new Set())}
         externalMoveId={externalMoveId}
-        onClearExternalMove={onClearExternalMove}
+        onCancelExternalMove={onMoveComplete}
+        onStartMove={onStartMove}
         onBatchRestrict={(ids) => {
           setPendingIds(ids);
           setBatchRestrictOpen(true);
@@ -280,11 +308,17 @@ function Panel({
   );
 }
 
-function DeleteButton({ onClick }: { onClick: () => void }) {
+function DeleteButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/20"
+      disabled={disabled}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+        disabled
+          ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+          : "bg-destructive/10 text-destructive hover:bg-destructive/20",
+      )}
     >
       <Trash2 className="size-3.5" /> Delete
     </button>
@@ -394,20 +428,23 @@ function BenchManagement({
   selectedIds,
   onToggleSelect,
   onSetSelected,
+  movingBenchId,
   onStartMove,
-  onEditBench,
+  onMoveComplete,
 }: {
   benches: Bench[];
   selectedIds: Set<string>;
   onToggleSelect: (id: string, multi: boolean) => void;
   onSetSelected: (ids: Set<string>) => void;
+  movingBenchId: string | null;
   onStartMove: (benchId: string) => void;
-  onEditBench: (benchId: string, updates: { code?: string; region?: Region }) => Promise<void>;
+  onMoveComplete: () => void;
 }) {
   const router = useRouter();
   const [code, setCode] = React.useState("");
   const [region, setRegion] = React.useState<Region>("north");
-  const [description, setDescription] = React.useState("");
+  const [lat, setLat] = React.useState("");
+  const [lng, setLng] = React.useState("");
   const [adding, setAdding] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [regionFilter, setRegionFilter] = React.useState<Region | "all">("all");
@@ -416,14 +453,51 @@ function BenchManagement({
   const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
   const [batchRestrictOpen, setBatchRestrictOpen] = React.useState(false);
   const [batchUnrestrictOpen, setBatchUnrestrictOpen] = React.useState(false);
-  const [editingBenchId, setEditingBenchId] = React.useState<string | null>(null);
-  const [editCode, setEditCode] = React.useState("");
-  const [editRegion, setEditRegion] = React.useState<Region>("north");
-  const [editSaving, setEditSaving] = React.useState(false);
+  const [moveLat, setMoveLat] = React.useState("");
+  const [moveLng, setMoveLng] = React.useState("");
+  const [moveSaving, setMoveSaving] = React.useState(false);
+  const listRef = React.useRef<HTMLDivElement>(null);
 
-  const singleSelected = selectedIds.size === 1
-    ? benches.find((b) => b.id === Array.from(selectedIds)[0]) ?? null
-    : null;
+  React.useEffect(() => {
+    if (!movingBenchId) return;
+    const bench = benches.find((b) => b.id === movingBenchId);
+    if (bench) {
+      setMoveLat(bench.latitude.toFixed(6));
+      setMoveLng(bench.longitude.toFixed(6));
+    }
+    requestAnimationFrame(() => {
+      const container = listRef.current;
+      if (!container) return;
+      const row = container.querySelector(`[data-bench-id="${movingBenchId}"]`) as HTMLElement | null;
+      if (row) {
+        const containerRect = container.getBoundingClientRect();
+        const rowRect = row.getBoundingClientRect();
+        const stickyHeader = container.querySelector(".sticky") as HTMLElement | null;
+        const headerHeight = stickyHeader ? stickyHeader.getBoundingClientRect().height : 0;
+        container.scrollTop += rowRect.top - containerRect.top - headerHeight;
+      }
+    });
+  }, [movingBenchId]);
+
+  async function saveMove() {
+    if (!movingBenchId) return;
+    const parsedLat = parseFloat(moveLat);
+    const parsedLng = parseFloat(moveLng);
+    if (isNaN(parsedLat) || isNaN(parsedLng)) {
+      toast.error("Enter valid coordinates.");
+      return;
+    }
+    setMoveSaving(true);
+    const res = await adminUpdateBenchCoordinates(movingBenchId, parsedLat, parsedLng);
+    setMoveSaving(false);
+    if (res.ok) {
+      toast.success("Coordinates updated.");
+      onMoveComplete();
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not update coordinates.");
+    }
+  }
 
   const filtered = benches.filter((b) => {
     if (showSelectedOnly && !selectedIds.has(b.id)) return false;
@@ -434,6 +508,12 @@ function BenchManagement({
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((b) => selectedIds.has(b.id));
+
+  const [editingCodeId, setEditingCodeId] = React.useState<string | null>(null);
+  const [editCode, setEditCode] = React.useState("");
+  const [editingRegionId, setEditingRegionId] = React.useState<string | null>(null);
+  const [editRegion, setEditRegion] = React.useState<Region>("north");
+  const [editSaving, setEditSaving] = React.useState(false);
 
   const selectedRestrictedCount = benches.filter(
     (b) => selectedIds.has(b.id) && b.restricted,
@@ -457,12 +537,15 @@ function BenchManagement({
   async function add(e: React.FormEvent) {
     e.preventDefault();
     setAdding(true);
-    const res = await adminAddBench({ code, region, description });
+    const parsedLat = lat ? parseFloat(lat) : undefined;
+    const parsedLng = lng ? parseFloat(lng) : undefined;
+    const res = await adminAddBench({ code, region, latitude: parsedLat, longitude: parsedLng });
     setAdding(false);
     if (res.ok) {
       toast.success(`Added bench ${code.toUpperCase()}.`);
       setCode("");
-      setDescription("");
+      setLat("");
+      setLng("");
       router.refresh();
     } else {
       toast.error(res.error ?? "Could not add bench.");
@@ -532,6 +615,32 @@ function BenchManagement({
     }
   }
 
+  async function saveCode(benchId: string) {
+    setEditSaving(true);
+    const res = await adminUpdateBench(benchId, { code: editCode });
+    setEditSaving(false);
+    if (res.ok) {
+      toast.success("Code updated.");
+      setEditingCodeId(null);
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not update code.");
+    }
+  }
+
+  async function saveRegion(benchId: string) {
+    setEditSaving(true);
+    const res = await adminUpdateBench(benchId, { region: editRegion });
+    setEditSaving(false);
+    if (res.ok) {
+      toast.success("Region updated.");
+      setEditingRegionId(null);
+      router.refresh();
+    } else {
+      toast.error(res.error ?? "Could not update region.");
+    }
+  }
+
   return (
     <Panel
       title="Bench management"
@@ -566,12 +675,25 @@ function BenchManagement({
             ))}
           </select>
         </label>
-        <label className="flex flex-1 flex-col gap-1">
-          <span className="text-xs font-semibold text-park-ink">Location</span>
+        <label className="flex flex-col gap-1 sm:w-32">
+          <span className="text-xs font-semibold text-park-ink">Latitude</span>
           <Input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="North Meadow"
+            type="number"
+            step="any"
+            value={lat}
+            onChange={(e) => setLat(e.target.value)}
+            placeholder="40.8960"
+            className="bg-park-bg/50"
+          />
+        </label>
+        <label className="flex flex-col gap-1 sm:w-32">
+          <span className="text-xs font-semibold text-park-ink">Longitude</span>
+          <Input
+            type="number"
+            step="any"
+            value={lng}
+            onChange={(e) => setLng(e.target.value)}
+            placeholder="-73.8867"
             className="bg-park-bg/50"
           />
         </label>
@@ -581,170 +703,132 @@ function BenchManagement({
           className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-park-green px-4 text-sm font-bold text-white hover:bg-park-green/90 disabled:opacity-60"
         >
           {adding && <Loader2 className="size-4 animate-spin" />}
-          Add bench
+          Add
         </button>
       </form>
 
-      {/* Search + filter + batch actions */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Input
-          placeholder="Search benches by code"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-9 w-44 bg-park-bg/50"
-        />
-        <label className="flex items-center gap-1.5 text-xs text-park-muted cursor-pointer select-none">
+      {/* Select all + deselect + show selected + batch actions */}
+      <div className="mb-3 flex items-center gap-2">
+        <label className="flex items-center gap-1 text-[11px] text-park-muted cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={allFilteredSelected}
+            onChange={toggleAll}
+            className="size-3 accent-park-green"
+          />
+          Select all ({filtered.length})
+        </label>
+        <label className={cn(
+          "flex items-center gap-1 text-[11px] cursor-pointer select-none",
+          selectedIds.size === 0 ? "text-park-muted/30 cursor-not-allowed" : "text-park-muted",
+        )}>
+          <input
+            type="checkbox"
+            checked={false}
+            onChange={() => onSetSelected(new Set())}
+            disabled={selectedIds.size === 0}
+            className="size-3 accent-park-green"
+          />
+          Deselect
+        </label>
+        <label className="flex items-center gap-1 text-[11px] text-park-muted cursor-pointer select-none">
           <input
             type="checkbox"
             checked={showSelectedOnly}
             onChange={(e) => setShowSelectedOnly(e.target.checked)}
-            className="size-3.5 accent-park-green"
+            className="size-3 accent-park-green"
           />
           Show selected ({selectedIds.size})
         </label>
-        {selectedIds.size > 0 && (
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {selectedUnrestrictedCount > 0 && (
-              <button
-                onClick={() => setBatchRestrictOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-destructive/10 px-3 py-1.5 text-xs font-bold text-destructive transition-colors hover:bg-destructive/20"
-              >
-                <Lock className="size-3.5" />
-                Restrict {selectedUnrestrictedCount}
-              </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => setBatchRestrictOpen(true)}
+            disabled={selectedUnrestrictedCount === 0 || !!movingBenchId}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+              selectedUnrestrictedCount === 0 || movingBenchId
+                ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                : "bg-destructive/10 text-destructive hover:bg-destructive/20",
             )}
-            {selectedRestrictedCount > 0 && (
-              <button
-                onClick={() => setBatchUnrestrictOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-park-green/10 px-3 py-1.5 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
-              >
-                <Unlock className="size-3.5" />
-                Unrestrict {selectedRestrictedCount}
-              </button>
+          >
+            <Lock className="size-3.5" />
+            Restrict {selectedUnrestrictedCount || 0}
+          </button>
+          <button
+            onClick={() => setBatchUnrestrictOpen(true)}
+            disabled={selectedRestrictedCount === 0 || !!movingBenchId}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+              selectedRestrictedCount === 0 || movingBenchId
+                ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                : "bg-park-green/10 text-park-green hover:bg-park-green/20",
             )}
-            <button
-              onClick={() => setBatchDeleteOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-destructive/90"
-            >
-              <Trash2 className="size-3.5" />
-              Delete {selectedIds.size}
-            </button>
-          </div>
-        )}
+          >
+            <Unlock className="size-3.5" />
+            Unrestrict {selectedRestrictedCount || 0}
+          </button>
+        </div>
       </div>
 
-      {/* Inline edit form */}
-      {singleSelected && editingBenchId === singleSelected.id && (
-        <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3">
-          <p className="mb-2 text-sm font-bold text-park-ink">
-            Edit — Bench {singleSelected.code}
-          </p>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-semibold text-park-ink">Code</span>
-              <Input
-                value={editCode}
-                onChange={(e) => setEditCode(e.target.value)}
-                className="h-8 w-24 bg-white"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-semibold text-park-ink">Region</span>
-              <select
-                value={editRegion}
-                onChange={(e) => setEditRegion(e.target.value as Region)}
-                className="h-8 rounded-md border border-park-border bg-white px-2 text-sm"
-              >
-                {REGIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {REGION_LABEL[r]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              onClick={async () => {
-                setEditSaving(true);
-                await onEditBench(singleSelected.id, {
-                  code: editCode,
-                  region: editRegion,
-                });
-                setEditSaving(false);
-                setEditingBenchId(null);
-              }}
-              disabled={editSaving}
-              className="h-8 rounded-md bg-park-green px-4 text-xs font-bold text-white hover:bg-park-green/90 disabled:opacity-60"
-            >
-              {editSaving ? "Saving…" : "Save"}
-            </button>
-            <button
-              onClick={() => setEditingBenchId(null)}
-              className="h-8 rounded-md border border-park-border px-4 text-xs font-bold text-park-muted hover:bg-park-sage/30"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Bench list with checkboxes */}
-      <div className="min-h-[320px] max-h-[320px] overflow-auto rounded-xl border border-park-border">
+      <div ref={listRef} className="min-h-[380px] max-h-[380px] overflow-auto rounded-xl border border-park-border">
         {filtered.length === 0 ? (
           <p className="p-4 text-sm text-park-muted">No benches found.</p>
         ) : (
           <>
-            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-park-border bg-park-sage/30 px-4 py-2">
-              <input
-                type="checkbox"
-                checked={allFilteredSelected}
-                onChange={toggleAll}
-                className="size-4 accent-park-green"
-              />
-              <span className="flex-1 text-xs font-semibold text-park-muted">
-                Select all ({filtered.length})
-              </span>
-              {singleSelected && editingBenchId !== singleSelected.id && (
-                <>
+            <div className="sticky top-0 z-10 flex items-center gap-x-3 border-b border-park-border bg-park-sage/90 px-4 py-2">
+              <div className="min-w-0 flex-1">
+                <Input
+                  placeholder="Search code"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="h-7 w-28 bg-white px-2 text-xs"
+                />
+              </div>
+              <div className="hidden shrink-0 sm:flex w-[68px] justify-end">
+                <select
+                  value={regionFilter}
+                  onChange={(e) => setRegionFilter(e.target.value as Region | "all")}
+                  className="h-7 w-full rounded-md border border-park-border bg-park-bg/50 px-1 text-xs text-park-muted"
+                >
+                  <option value="all">All</option>
+                  {REGIONS.map((r) => (
+                    <option key={r} value={r}>
+                      {REGION_LABEL[r]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <span className="w-[72px] shrink-0" />
+              <div className="w-[110px] shrink-0 flex justify-end">
+                {selectedIds.size > 0 && (
                   <button
-                    onClick={() => {
-                      setEditingBenchId(singleSelected.id);
-                      setEditCode(singleSelected.code);
-                      setEditRegion(singleSelected.region);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-md bg-park-green/10 px-2 py-1 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
+                    onClick={() => setBatchDeleteOpen(true)}
+                    disabled={!!movingBenchId}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+                      movingBenchId
+                        ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+                        : "bg-destructive text-white hover:bg-destructive/90",
+                    )}
                   >
-                    <Pencil className="size-3" />
-                    Edit
+                    <Trash2 className="size-3.5" />
+                    Delete {selectedIds.size}
                   </button>
-                  <button
-                    onClick={() => onStartMove(singleSelected.id)}
-                    className="inline-flex items-center gap-1 rounded-md bg-park-green/10 px-2 py-1 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
-                  >
-                    <Move className="size-3" />
-                    Move
-                  </button>
-                </>
-              )}
-              <select
-                value={regionFilter}
-                onChange={(e) => setRegionFilter(e.target.value as Region | "all")}
-                className="hidden h-7 rounded-md border border-park-border bg-park-bg/50 px-2 text-xs text-park-muted sm:block"
-              >
-                <option value="all">All regions</option>
-                {REGIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {REGION_LABEL[r]}
-                  </option>
-                ))}
-              </select>
-              <span className="hidden w-[68px] sm:block" />
+                )}
+              </div>
             </div>
             {filtered.slice(0, 80).map((b) => (
               <div
                 key={b.id}
+                data-bench-id={b.id}
                 className={cn(
-                  "flex items-center gap-3 border-b border-park-border px-4 py-2.5 last:border-b-0",
-                  selectedIds.has(b.id) && "bg-amber-50/50",
+                  "flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-park-border px-4 py-2.5 last:border-b-0",
+                  movingBenchId === b.id
+                    ? "bg-amber-100"
+                    : movingBenchId
+                      ? "opacity-40 pointer-events-none"
+                      : selectedIds.has(b.id) && "bg-amber-50/50",
                 )}
               >
                 <input
@@ -752,21 +836,160 @@ function BenchManagement({
                   checked={selectedIds.has(b.id)}
                   onChange={() => onToggleSelect(b.id, true)}
                   className="size-4 shrink-0 accent-park-green"
+                  disabled={movingBenchId === b.id}
                 />
-                <div className="min-w-0 flex-1">
-                  <span className="font-semibold text-park-ink">
-                    Bench {b.code}
-                  </span>
+                <div className="min-w-0 flex-1 flex items-center gap-1 overflow-hidden">
+                  {editingCodeId === b.id ? (
+                    <>
+                      <span className="text-sm text-park-muted">Bench</span>
+                      <Input
+                        value={editCode}
+                        onChange={(e) => setEditCode(e.target.value)}
+                        autoFocus
+                        className="h-6 w-16 bg-white px-1.5 text-sm font-semibold"
+                        onKeyDown={(e) => { if (e.key === "Enter") saveCode(b.id); if (e.key === "Escape") setEditingCodeId(null); }}
+                      />
+                      <button
+                        onClick={() => saveCode(b.id)}
+                        disabled={editSaving}
+                        className="rounded p-0.5 text-park-green hover:bg-park-green/10 disabled:opacity-50"
+                      >
+                        {editSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => setEditingCodeId(null)}
+                        disabled={editSaving}
+                        className="rounded p-0.5 text-destructive/60 hover:text-destructive disabled:opacity-50"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-semibold text-park-ink">
+                        Bench {b.code}
+                      </span>
+                      <button
+                        onClick={() => { setEditingCodeId(b.id); setEditCode(b.code); setEditingRegionId(null); }}
+                        disabled={movingBenchId === b.id}
+                        className={cn(
+                          "rounded p-0.5",
+                          movingBenchId === b.id
+                            ? "text-park-muted/20 cursor-not-allowed"
+                            : "text-park-muted/50 hover:text-park-ink",
+                        )}
+                      >
+                        <Pencil className="size-3" />
+                      </button>
+                    </>
+                  )}
                   {b.restricted && (
-                    <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive">
+                    <span className="ml-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive">
                       Restricted
                     </span>
                   )}
                 </div>
-                <span className="hidden text-sm text-park-muted sm:block">
-                  {REGION_LABEL[b.region]}
-                </span>
-                <DeleteButton onClick={() => setDeleteTarget(b)} />
+                <div className="hidden shrink-0 sm:flex items-center gap-1 w-[68px] justify-end">
+                  {editingRegionId === b.id ? (
+                    <>
+                      <select
+                        value={editRegion}
+                        onChange={(e) => setEditRegion(e.target.value as Region)}
+                        autoFocus
+                        className="h-6 rounded-md border border-park-border bg-white px-1 text-xs"
+                      >
+                        {REGIONS.map((r) => (
+                          <option key={r} value={r}>{REGION_LABEL[r]}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => saveRegion(b.id)}
+                        disabled={editSaving}
+                        className="rounded p-0.5 text-park-green hover:bg-park-green/10 disabled:opacity-50"
+                      >
+                        {editSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => setEditingRegionId(null)}
+                        disabled={editSaving}
+                        className="rounded p-0.5 text-destructive/60 hover:text-destructive disabled:opacity-50"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm text-park-muted">
+                        {REGION_LABEL[b.region]}
+                      </span>
+                      <button
+                        onClick={() => { setEditingRegionId(b.id); setEditRegion(b.region); setEditingCodeId(null); }}
+                        disabled={movingBenchId === b.id}
+                        className={cn(
+                          "rounded p-0.5",
+                          movingBenchId === b.id
+                            ? "text-park-muted/20 cursor-not-allowed"
+                            : "text-park-muted/50 hover:text-park-ink",
+                        )}
+                      >
+                        <Pencil className="size-3" />
+                      </button>
+                    </>
+                  )}
+                </div>
+                {movingBenchId === b.id ? (
+                  <button
+                    onClick={onMoveComplete}
+                    className="inline-flex w-[72px] shrink-0 items-center gap-1 rounded-md bg-gray-500 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-gray-600"
+                  >
+                    <XCircle className="size-3 shrink-0" />
+                    Cancel
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onStartMove(b.id)}
+                    className="inline-flex w-[72px] shrink-0 items-center gap-1 rounded-md border border-park-border px-2 py-1 text-xs font-bold text-park-muted transition-colors hover:bg-park-sage/30"
+                  >
+                    <Move className="size-3 shrink-0" />
+                    Move
+                  </button>
+                )}
+                {movingBenchId === b.id ? (
+                  <button
+                    onClick={saveMove}
+                    disabled={moveSaving}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-park-green px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-park-green/90 disabled:opacity-60"
+                  >
+                    {moveSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                    {moveSaving ? "Saving…" : "Save"}
+                  </button>
+                ) : (
+                  <DeleteButton onClick={() => setDeleteTarget(b)} />
+                )}
+                {movingBenchId === b.id && (
+                  <div className="flex w-full items-center justify-center gap-2">
+                    <label className="flex items-center gap-1 text-xs font-semibold text-park-ink">
+                      Lat
+                      <Input
+                        type="number"
+                        step="any"
+                        value={moveLat}
+                        onChange={(e) => setMoveLat(e.target.value)}
+                        className="h-6 w-28 bg-white px-1.5 text-xs"
+                      />
+                    </label>
+                    <label className="flex items-center gap-1 text-xs font-semibold text-park-ink">
+                      Lng
+                      <Input
+                        type="number"
+                        step="any"
+                        value={moveLng}
+                        onChange={(e) => setMoveLng(e.target.value)}
+                        className="h-6 w-28 bg-white px-1.5 text-xs"
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
             ))}
             {filtered.length > 80 && (
@@ -972,42 +1195,42 @@ function ReservationManagement({
           onChange={(e) => setUserQ(e.target.value)}
           className="h-9 w-40 bg-park-bg/50"
         />
-        {selected.size > 0 && (
-          <div className="ml-auto flex items-center gap-2">
-            {selectedActiveCount > 0 && (
-              <button
-                onClick={() => setBatchCancelOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-amber-600"
-              >
-                <XCircle className="size-3.5" />
-                Cancel {selectedActiveCount} active
-              </button>
-            )}
-            <button
-              onClick={() => setBatchDeleteOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-destructive/90"
-            >
-              <Trash2 className="size-3.5" />
-              Delete {selected.size} selected
-            </button>
-          </div>
-        )}
       </div>
-      <div className="max-h-72 overflow-auto rounded-xl border border-park-border">
+      <div className="min-h-[320px] max-h-[320px] overflow-auto rounded-xl border border-park-border">
         {filtered.length === 0 ? (
           <p className="p-4 text-sm text-park-muted">No reservations found.</p>
         ) : (
           <>
-            <div className="flex items-center gap-3 border-b border-park-border bg-park-sage/30 px-4 py-2">
+            <div className="sticky top-0 z-10 flex h-10 items-center gap-2 border-b border-park-border bg-park-sage/90 px-4">
               <input
                 type="checkbox"
                 checked={allFilteredSelected}
                 onChange={toggleAll}
                 className="size-4 accent-park-green"
               />
-              <span className="text-xs font-semibold text-park-muted">
+              <span className="flex-1 text-xs font-semibold text-park-muted">
                 Select all ({filtered.length})
               </span>
+              {selected.size > 0 && (
+                <>
+                  {selectedActiveCount > 0 && (
+                    <button
+                      onClick={() => setBatchCancelOpen(true)}
+                      className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-amber-600"
+                    >
+                      <XCircle className="size-3" />
+                      Cancel {selectedActiveCount}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setBatchDeleteOpen(true)}
+                    className="inline-flex items-center gap-1 rounded-md bg-destructive px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-destructive/90"
+                  >
+                    <Trash2 className="size-3" />
+                    Delete {selected.size}
+                  </button>
+                </>
+              )}
             </div>
             {filtered.map((r) => (
               <div
