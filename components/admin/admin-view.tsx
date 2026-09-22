@@ -633,38 +633,6 @@ function BenchManagement({
         )}
       </div>
 
-      {/* Single-bench edit panel */}
-      {singleSelected && editingBenchId !== singleSelected.id && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-park-border bg-park-surface p-3">
-          <span className="text-sm font-bold text-park-ink">
-            Bench {singleSelected.code}
-          </span>
-          <span className="text-xs text-park-muted">
-            {REGION_LABEL[singleSelected.region]}
-          </span>
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => {
-                setEditingBenchId(singleSelected.id);
-                setEditCode(singleSelected.code);
-                setEditRegion(singleSelected.region);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-md bg-park-green/10 px-3 py-1.5 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
-            >
-              <Pencil className="size-3.5" />
-              Edit
-            </button>
-            <button
-              onClick={() => onStartMove(singleSelected.id)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-park-green/10 px-3 py-1.5 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
-            >
-              <Move className="size-3.5" />
-              Move
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Inline edit form */}
       {singleSelected && editingBenchId === singleSelected.id && (
         <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3">
@@ -720,12 +688,12 @@ function BenchManagement({
       )}
 
       {/* Bench list with checkboxes */}
-      <div className="max-h-72 overflow-auto rounded-xl border border-park-border">
+      <div className="min-h-[320px] max-h-[320px] overflow-auto rounded-xl border border-park-border">
         {filtered.length === 0 ? (
           <p className="p-4 text-sm text-park-muted">No benches found.</p>
         ) : (
           <>
-            <div className="flex items-center gap-3 border-b border-park-border bg-park-sage/30 px-4 py-2">
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-park-border bg-park-sage/30 px-4 py-2">
               <input
                 type="checkbox"
                 checked={allFilteredSelected}
@@ -735,6 +703,28 @@ function BenchManagement({
               <span className="flex-1 text-xs font-semibold text-park-muted">
                 Select all ({filtered.length})
               </span>
+              {singleSelected && editingBenchId !== singleSelected.id && (
+                <>
+                  <button
+                    onClick={() => {
+                      setEditingBenchId(singleSelected.id);
+                      setEditCode(singleSelected.code);
+                      setEditRegion(singleSelected.region);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md bg-park-green/10 px-2 py-1 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
+                  >
+                    <Pencil className="size-3" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => onStartMove(singleSelected.id)}
+                    className="inline-flex items-center gap-1 rounded-md bg-park-green/10 px-2 py-1 text-xs font-bold text-park-green transition-colors hover:bg-park-green/20"
+                  >
+                    <Move className="size-3" />
+                    Move
+                  </button>
+                </>
+              )}
               <select
                 value={regionFilter}
                 onChange={(e) => setRegionFilter(e.target.value as Region | "all")}

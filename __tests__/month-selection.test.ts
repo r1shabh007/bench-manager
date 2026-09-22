@@ -34,10 +34,36 @@ describe("nextMonthSelection", () => {
     ]);
   });
 
-  it("rule 3: clicking a non-adjacent block resets to that block", () => {
+  it("rule 3: clicking a non-adjacent block fills the range", () => {
     expect(
       nextMonthSelection(["2026-03", "2026-04"], "2026-08").months,
+    ).toEqual([
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+    ]);
+  });
+
+  it("rule 3: range fill resets to clicked block if unavailable month in between", () => {
+    const unavailable = new Set(["2026-06"]);
+    expect(
+      nextMonthSelection(["2026-03", "2026-04"], "2026-08", unavailable).months,
     ).toEqual(["2026-08"]);
+  });
+
+  it("rule 3: range fill works backward", () => {
+    expect(
+      nextMonthSelection(["2026-06", "2026-07"], "2026-03").months,
+    ).toEqual([
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+    ]);
   });
 
   it("rule 4: clicking a selected block deselects it and everything after", () => {

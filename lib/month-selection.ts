@@ -9,7 +9,7 @@
  *
  * Invariant: `current` is a contiguous, ascending run of months.
  */
-import { monthIndex, sortMonths, type Month } from "./months";
+import { addMonths, monthIndex, sortMonths, type Month } from "./months";
 
 export interface SelectionResult {
   months: Month[];
@@ -44,20 +44,30 @@ export function nextMonthSelection(
   const sorted = sortMonths(current);
   const firstIdx = monthIndex(sorted[0]);
   const lastIdx = monthIndex(sorted[sorted.length - 1]);
-  const isAdjacent = clickedIdx === firstIdx - 1 || clickedIdx === lastIdx + 1;
 
-  // Rule 3: clicking a non-adjacent block resets to just that block.
-  if (!isAdjacent) {
-    return { months: [clicked] };
-  }
+  // Build a contiguous range from the earliest to the latest point.
+  const rangeStartIdx = Math.min(firstIdx, clickedIdx);
+  const rangeEndIdx = Math.max(lastIdx, clickedIdx);
+  const span = rangeEndIdx - rangeStartIdx + 1;
 
-  // Rule 2: extend the run (may cross the Dec -> Jan boundary).
-  const extended = sortMonths([...sorted, clicked]);
-
-  // Rule 5: never extend past 12 months.
-  if (extended.length > MAX_MONTHS) {
+  // Too long — cap at 12 months.
+  if (span > MAX_MONTHS) {
     return { months: current, notice: LIMIT_NOTICE };
   }
 
-  return { months: extended };
+  // Build the full range and check for unavailable months in between.
+  const startMonth = sorted[0];
+  const rangeStart =
+    clickedIdx < firstIdx ? clicked : startMonth;
+  const range: Month[] = [];
+  for (let i = 0; i < span; i++) {
+    const m = addMonths(rangeStart, i);
+    if (unavailable.has(m)) {
+      // Unavailable month in the way — reset to just the clicked month.
+      return { months: [clicked] };
+    }
+    range.push(m);
+  }
+
+  return { months: range };
 }
