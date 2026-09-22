@@ -1,37 +1,26 @@
 import { Suspense } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { getBenches, getBookedMonths } from "@/lib/data";
+import { getSessionUser } from "@/lib/auth";
 import { ReservationProvider } from "@/components/reservation/reservation-provider";
 import { BenchMap } from "@/components/bench-map/bench-map";
 import { MapLegend } from "@/components/bench-map/map-legend";
 import { HomeCta } from "@/components/home/home-cta";
 import { AutoLogin } from "@/components/home/auto-login";
+import { TreeDeciduous, MapPin, Calendar } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-const STEPS = [
-  {
-    n: "01",
-    title: "Choose a bench",
-    body: "Explore North, Central, and South park areas.",
-  },
-  {
-    n: "02",
-    title: "Choose your months",
-    body: "Reserve consecutive months in the current or next year.",
-  },
-  {
-    n: "03",
-    title: "Make it yours",
-    body: "Log in to confirm your adoption and support the park.",
-  },
-];
 
 export default async function HomePage() {
-  const [benches, booked] = await Promise.all([
+  const [benches, booked, user] = await Promise.all([
     getBenches(),
     getBookedMonths(),
+    getSessionUser(),
   ]);
+
+  const availableCount = benches.filter((b) => !b.restricted).length;
 
   return (
     <div className="flex flex-col">
@@ -40,70 +29,101 @@ export default async function HomePage() {
       </Suspense>
 
       {/* Hero */}
-      <section className="flex flex-col items-center gap-10 px-5 py-14 sm:px-[72px] lg:flex-row lg:gap-14">
-        <div className="flex flex-1 flex-col items-start gap-4">
-          <p className="text-xs font-bold uppercase tracking-wide text-park-rust">
-            Care for Van Cortlandt Park
-          </p>
-          <h1 className="font-serif text-4xl leading-[1.05] text-park-green sm:text-5xl">
-            Adopt a bench. Leave a lasting welcome.
-          </h1>
-          <p className="max-w-xl text-lg leading-relaxed text-park-muted">
-            Choose from more than 500 park benches and support the places where
-            neighbors rest, meet, and take in the landscape. Adopt for
-            consecutive months—up to one year.
-          </p>
-          <HomeCta />
-        </div>
-        <div className="relative aspect-[620/430] w-full max-w-xl overflow-hidden rounded-[20px] lg:w-[620px]">
-          <Image
-            src="/hero-park.png"
-            alt="A bench along a wooded path in Van Cortlandt Park"
-            fill
-            priority
-            sizes="(max-width: 1024px) 100vw, 620px"
-            className="object-cover"
-          />
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-park-sage/40 via-park-bg to-park-bg" />
+        <div className="relative flex flex-col items-center gap-10 px-5 py-16 sm:px-[72px] sm:py-20 lg:flex-row lg:gap-14">
+          <div className="flex flex-1 flex-col items-start gap-5">
+            <p className="inline-flex items-center gap-1.5 rounded-full bg-park-green/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-park-green">
+              <TreeDeciduous className="size-3.5" />
+              Van Cortlandt Park
+            </p>
+            <h1 className="font-serif text-4xl leading-[1.05] text-park-green sm:text-5xl lg:text-[3.5rem]">
+              Adopt a bench.
+              <br />
+              <span className="text-park-rust">Leave a lasting welcome.</span>
+            </h1>
+            <p className="max-w-lg text-lg leading-relaxed text-park-muted">
+              Choose from more than {availableCount} park benches and support the
+              places where neighbors rest, meet, and take in the landscape.
+            </p>
+            <HomeCta loggedIn={!!user} />
+          </div>
+          <div className="relative w-full max-w-xl lg:w-[580px]">
+            <div className="absolute -inset-3 rounded-[28px] bg-park-green/10" />
+            <div className="relative aspect-[620/430] overflow-hidden rounded-[20px] shadow-xl">
+              <Image
+                src="/hero-park.png"
+                alt="A bench along a wooded path in Van Cortlandt Park"
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 580px"
+                className="object-cover"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Program steps */}
-      <section
-        id="how-it-works"
-        className="bg-park-sage px-5 py-9 sm:px-[72px]"
-      >
-        <div className="grid gap-4 sm:grid-cols-3">
-          {STEPS.map((s) => (
-            <div
-              key={s.n}
-              className="flex flex-col gap-2 rounded-xl bg-park-surface p-5"
-            >
-              <p className="text-xs font-bold text-park-rust">{s.n}</p>
-              <p className="font-serif text-xl text-park-green">{s.title}</p>
-              <p className="text-[13px] leading-relaxed text-park-muted">
-                {s.body}
-              </p>
+      {/* Highlights strip */}
+      <section className="border-y border-park-border/60 bg-park-surface">
+        <div className="mx-auto flex max-w-5xl flex-col items-center justify-center gap-6 px-5 py-6 sm:flex-row sm:gap-12 sm:divide-x sm:divide-park-border/60 sm:py-5">
+          <div className="flex items-center gap-3 sm:pr-12">
+            <div className="flex size-10 items-center justify-center rounded-full bg-park-sage">
+              <MapPin className="size-5 text-park-green" />
             </div>
-          ))}
+            <div>
+              <p className="text-xl font-bold text-park-green">{availableCount}+</p>
+              <p className="text-xs text-park-muted">Benches available</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 sm:pl-12 sm:pr-12">
+            <div className="flex size-10 items-center justify-center rounded-full bg-park-sage">
+              <Calendar className="size-5 text-park-green" />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-park-green">1–12</p>
+              <p className="text-xs text-park-muted">Months per adoption</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 sm:pl-12">
+            <div className="flex size-10 items-center justify-center rounded-full bg-park-sage">
+              <TreeDeciduous className="size-5 text-park-green" />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-park-green">Bronx, NY</p>
+              <p className="text-xs text-park-muted">Van Cortlandt Park</p>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Bench availability preview (read-only map) */}
-      <section className="flex flex-col gap-5 px-5 py-12 sm:px-[72px] sm:py-14">
-        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+      <section className="flex flex-col gap-6 px-5 py-14 sm:px-[72px] sm:py-16">
+        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5">
             <h2 className="font-serif text-3xl text-park-green">
               Find your place in the park
             </h2>
             <p className="text-sm text-park-muted">
-              A preview of current bench availability
+              Browse bench locations and availability across all regions
             </p>
           </div>
           <MapLegend />
         </div>
-        <ReservationProvider init={{ benches, booked }}>
-          <BenchMap readOnly />
-        </ReservationProvider>
+        <div className="overflow-hidden rounded-2xl border border-park-border/60 shadow-sm">
+          <ReservationProvider init={{ benches, booked }}>
+            <BenchMap readOnly />
+          </ReservationProvider>
+        </div>
+        <div className="flex justify-center pt-2">
+          <Link
+            href="/reservation"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-park-green transition-colors hover:text-park-rust"
+          >
+            Explore all benches and start your reservation
+            <span aria-hidden="true">&rarr;</span>
+          </Link>
+        </div>
       </section>
     </div>
   );
