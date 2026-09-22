@@ -34,10 +34,10 @@ export function Nav({ user }: { user: SessionUser | null }) {
     <header className="sticky top-0 z-[1000] flex h-[76px] w-full items-center justify-between border-b border-park-border bg-park-surface px-5 sm:px-14">
       <Link href="/" className="flex items-center gap-2.5">
         <img
-          src="/brand/tree-deciduous.svg"
+          src="/brand/vcp-logo.png"
           alt=""
-          width={25}
-          height={25}
+          width={32}
+          height={32}
         />
         <span className="flex flex-col leading-none">
           <span className="font-serif text-xl font-bold text-park-green">

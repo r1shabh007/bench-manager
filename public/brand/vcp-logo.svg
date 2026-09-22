@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Outer circle arc — center (100,92), r=74, gap at lower-left -->
+  <path d="M108 164 A74 74 0 1 1 42 132" stroke="#555" stroke-width="13" stroke-linecap="round" fill="none"/>
+  <!-- Trunk -->
+  <rect x="96" y="103" width="8" height="55" rx="2" fill="#aaa"/>
+  <!-- Hub dome -->
+  <circle cx="100" cy="92" r="11" fill="#777"/>
+  <!-- 6 leaves evenly spaced 40° apart, radiating from hub (100,92) -->
+  <ellipse cx="100" cy="66" rx="9" ry="20" transform="rotate(-100 100 92)" fill="#2AAFA1"/>
+  <ellipse cx="100" cy="66" rx="9" ry="20" transform="rotate(-60 100 92)" fill="#C0D843"/>
+  <ellipse cx="100" cy="66" rx="9" ry="20" transform="rotate(-20 100 92)" fill="#9CCF48"/>
+  <ellipse cx="100" cy="66" rx="9" ry="20" transform="rotate(20 100 92)" fill="#7FB840"/>
+  <ellipse cx="100" cy="66" rx="9" ry="20" transform="rotate(60 100 92)" fill="#2AAFA1"/>
+  <ellipse cx="100" cy="66" rx="9" ry="20" transform="rotate(100 100 92)" fill="#3B9E7C"/>
+</svg>

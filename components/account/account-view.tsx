@@ -158,7 +158,7 @@ function ReservationCard({
         <div className="mt-4 flex justify-end border-t border-park-border pt-4">
           <button
             onClick={() => setConfirmOpen(true)}
-            className="inline-flex h-11 items-center justify-center rounded-md bg-destructive/10 px-5 text-sm font-bold text-destructive transition-colors hover:bg-destructive/20"
+            className="inline-flex h-11 items-center justify-center rounded-md bg-destructive px-5 text-sm font-bold text-white transition-colors hover:bg-destructive/90"
           >
             Cancel reservation
           </button>
