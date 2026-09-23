@@ -1,73 +1,54 @@
 /**
- * Pure calendar month-selection reducer (spec §5.2 "Selection rules").
+ * Year-selection reducer for the adoption picker.
  *
- * The canonical signature from the spec is
- *   nextMonthSelection(current: Month[], clicked: Month): Month[]
- * We extend it with an optional `unavailable` set (gray months for the selected
- * bench) and return an object so the caller can surface the non-blocking notices
- * the rules require. `result.months` is always the new selection.
- *
- * Invariant: `current` is a contiguous, ascending run of months.
+ * Users select contiguous years (up to 10). Internally, each selected year
+ * maps to all 12 of its months so the rest of the system (availability,
+ * server actions, database) works unchanged at month granularity.
  */
-import { addMonths, monthIndex, sortMonths, type Month } from "./months";
 
-export interface SelectionResult {
-  months: Month[];
+export interface YearSelectionResult {
+  years: number[];
   notice?: string;
 }
 
-export const MAX_MONTHS = 12;
-export const LIMIT_NOTICE = "Adoptions are limited to 12 months.";
+export const MAX_YEARS = 10;
+export const LIMIT_NOTICE = "Adoptions are limited to 10 years.";
 
-export function nextMonthSelection(
-  current: Month[],
-  clicked: Month,
-  unavailable: Set<Month> = new Set(),
-): SelectionResult {
-  // A run can never include a gray block; gray blocks aren't clickable. No-op.
+export function nextYearSelection(
+  current: number[],
+  clicked: number,
+  unavailable: Set<number> = new Set(),
+): YearSelectionResult {
   if (unavailable.has(clicked)) {
-    return { months: current };
+    return { years: current };
   }
 
-  const clickedIdx = monthIndex(clicked);
-
-  // Rule 4: clicking a selected block deselects it and every block after it.
   if (current.includes(clicked)) {
-    return { months: current.filter((m) => monthIndex(m) < clickedIdx) };
+    return { years: current.filter((y) => y < clicked) };
   }
 
-  // Rule 1: nothing selected -> select the clicked block.
   if (current.length === 0) {
-    return { months: [clicked] };
+    return { years: [clicked] };
   }
 
-  const sorted = sortMonths(current);
-  const firstIdx = monthIndex(sorted[0]);
-  const lastIdx = monthIndex(sorted[sorted.length - 1]);
+  const sorted = [...current].sort((a, b) => a - b);
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const rangeStart = Math.min(first, clicked);
+  const rangeEnd = Math.max(last, clicked);
+  const span = rangeEnd - rangeStart + 1;
 
-  // Build a contiguous range from the earliest to the latest point.
-  const rangeStartIdx = Math.min(firstIdx, clickedIdx);
-  const rangeEndIdx = Math.max(lastIdx, clickedIdx);
-  const span = rangeEndIdx - rangeStartIdx + 1;
-
-  // Too long — cap at 12 months.
-  if (span > MAX_MONTHS) {
-    return { months: current, notice: LIMIT_NOTICE };
+  if (span > MAX_YEARS) {
+    return { years: current, notice: LIMIT_NOTICE };
   }
 
-  // Build the full range and check for unavailable months in between.
-  const startMonth = sorted[0];
-  const rangeStart =
-    clickedIdx < firstIdx ? clicked : startMonth;
-  const range: Month[] = [];
-  for (let i = 0; i < span; i++) {
-    const m = addMonths(rangeStart, i);
-    if (unavailable.has(m)) {
-      // Unavailable month in the way — reset to just the clicked month.
-      return { months: [clicked] };
+  const range: number[] = [];
+  for (let y = rangeStart; y <= rangeEnd; y++) {
+    if (unavailable.has(y)) {
+      return { years: [clicked] };
     }
-    range.push(m);
+    range.push(y);
   }
 
-  return { months: range };
+  return { years: range };
 }

@@ -40,6 +40,8 @@ export interface ReservationRow {
   status: "active" | "cancelled";
   created_at: string;
   cancelled_at: string | null;
+  plaque_message: string | null;
+  donation_amount: number | null;
 }
 
 export interface AdminReservationRow extends ReservationRow {

@@ -5,13 +5,13 @@ import {
   useReservationApi,
 } from "@/components/reservation/reservation-provider";
 import { REGION_LABEL } from "@/lib/types";
-import { formatRangeCompact, sortMonths } from "@/lib/months";
+import { formatYearRange } from "@/lib/months";
 
 /** The amber summary card above the calendar (Figma "Selected summary"). */
 export function SelectedSummary() {
   const store = useReservationApi();
   const selectedBenchId = useReservationStore((s) => s.selectedBenchId);
-  const selectedMonths = useReservationStore((s) => s.selectedMonths);
+  const selectedYears = useReservationStore((s) => s.selectedYears);
 
   const state = store.getState();
   const bench = state.benches.find((b) => b.id === selectedBenchId);
@@ -24,13 +24,13 @@ export function SelectedSummary() {
     );
   }
 
-  const sorted = sortMonths(selectedMonths);
+  const sorted = [...selectedYears].sort((a, b) => a - b);
   const subtitle =
     sorted.length > 0
-      ? `${formatRangeCompact(sorted[0], sorted[sorted.length - 1])} · ${
-          sorted.length === 1 ? "1 month" : `${sorted.length} consecutive months`
+      ? `${formatYearRange(sorted[0], sorted[sorted.length - 1])} · ${
+          sorted.length === 1 ? "1 year" : `${sorted.length} consecutive years`
         }`
-      : "Choose one or more continuous months below.";
+      : "Choose one or more consecutive years below.";
 
   return (
     <div className="flex flex-col gap-1 rounded-xl bg-month-summary p-4">

@@ -46,7 +46,7 @@ export async function getBookedMonths(): Promise<
   const supabase = await createClient();
   const year = currentYearNY();
   const start = `${year}-01-01`;
-  const end = `${monthKey(year + 1, 12)}-01`;
+  const end = `${monthKey(year + 14, 12)}-01`;
   const { data, error } = await supabase
     .from("reservation_months")
     .select("bench_id, month")
@@ -70,7 +70,7 @@ export async function getUserReservations(
   const { data, error } = await supabase
     .from("reservations")
     .select(
-      "id, bench_id, start_month, end_month, status, created_at, cancelled_at, benches(code, region, description)",
+      "id, bench_id, start_month, end_month, status, created_at, cancelled_at, plaque_message, donation_amount, benches(code, region, description)",
     )
     .eq("user_id", userId)
     .order("start_month", { ascending: false });
@@ -79,6 +79,34 @@ export async function getUserReservations(
     return [];
   }
   return (data ?? []).map(mapReservationRow);
+}
+
+/**
+ * Active reservations for the current year: bench_id, plaque_message.
+ * Returns a map of bench_id → plaque_message (empty string if no plaque).
+ */
+export async function getCurrentYearAdoptions(): Promise<
+  Map<string, string>
+> {
+  const supabase = await createClient();
+  const year = currentYearNY();
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-01`;
+  const { data, error } = await supabase
+    .from("reservations")
+    .select("bench_id, plaque_message")
+    .eq("status", "active")
+    .lte("start_month", yearEnd)
+    .gte("end_month", yearStart);
+  if (error) {
+    console.warn("[getCurrentYearAdoptions] falling back to empty:", error.message);
+    return new Map();
+  }
+  const map = new Map<string, string>();
+  for (const r of data ?? []) {
+    map.set(r.bench_id as string, (r.plaque_message as string) ?? "");
+  }
+  return map;
 }
 
 // ---- helpers ----
@@ -96,6 +124,8 @@ interface RawReservation {
   status: "active" | "cancelled";
   created_at: string;
   cancelled_at: string | null;
+  plaque_message?: string | null;
+  donation_amount?: number | null;
   benches: { code: string; region: Region; description: string | null } | null;
 }
 
@@ -112,6 +142,8 @@ export function mapReservationRow(r: unknown): ReservationRow {
     status: row.status,
     created_at: row.created_at,
     cancelled_at: row.cancelled_at,
+    plaque_message: row.plaque_message ?? null,
+    donation_amount: row.donation_amount ?? null,
   };
 }
 

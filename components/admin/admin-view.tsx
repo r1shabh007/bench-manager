@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Trash2, XCircle, X, Lock, Unlock, Pencil, Check, Move, ChevronDown } from "lucide-react";
+import { Loader2, Trash2, XCircle, X, Lock, Unlock, Pencil, Check, Move, ChevronDown, Eye, EyeOff } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -17,11 +17,10 @@ import {
 } from "@/lib/types";
 import {
   currentYearNY,
-  formatMonthLabel,
-  formatRangeCompact,
-  monthIndex,
+  formatYearRange,
   monthKey,
-  windowMonths,
+  parseMonth,
+  windowYears,
   type Month,
 } from "@/lib/months";
 import { toast } from "@/lib/toast";
@@ -1330,44 +1329,14 @@ function ReservationManagement({
               )}
             </div>
             {filtered.map((r) => (
-              <div
+              <AdminReservationItem
                 key={r.id}
-                className="flex items-center gap-2 border-b border-park-border px-3 py-2.5 last:border-b-0 sm:gap-3 sm:px-4 sm:py-3"
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.has(r.id)}
-                  onChange={() => toggleOne(r.id)}
-                  className="size-3.5 shrink-0 accent-park-green sm:size-4"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="whitespace-nowrap text-sm font-semibold text-park-ink sm:text-base">
-                    Bench {r.bench_code}
-                    <span
-                      className={cn(
-                        "ml-1.5 inline-block align-middle rounded px-1 py-0.5 text-[9px] font-bold uppercase sm:ml-2 sm:px-1.5 sm:text-[10px]",
-                        r.status === "cancelled"
-                          ? "bg-destructive/10 text-destructive"
-                          : "bg-park-sage text-park-green",
-                      )}
-                    >
-                      {r.status}
-                    </span>
-                  </p>
-                  <p className="truncate text-xs text-park-muted sm:text-sm">
-                    {r.firstName && r.lastName
-                      ? `${r.firstName} ${r.lastName} (${r.username})`
-                      : r.username}{" "}
-                    · {formatRangeCompact(r.start_month, r.end_month)}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5">
-                  {r.status === "active" && (
-                    <CancelButton onClick={() => setCancelTarget(r)} />
-                  )}
-                  <DeleteButton onClick={() => setDeleteTarget(r)} />
-                </div>
-              </div>
+                r={r}
+                checked={selected.has(r.id)}
+                onToggle={() => toggleOne(r.id)}
+                onCancel={() => setCancelTarget(r)}
+                onDelete={() => setDeleteTarget(r)}
+              />
             ))}
           </>
         )}
@@ -1421,6 +1390,98 @@ function ReservationManagement({
   );
 }
 
+function AdminReservationItem({
+  r,
+  checked,
+  onToggle,
+  onCancel,
+  onDelete,
+}: {
+  r: AdminReservationRow;
+  checked: boolean;
+  onToggle: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
+}) {
+  const [showPlaque, setShowPlaque] = React.useState(false);
+  return (
+    <div className="flex flex-col border-b border-park-border last:border-b-0">
+      <div className="flex items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggle}
+          className="size-3.5 shrink-0 accent-park-green sm:size-4"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="whitespace-nowrap text-sm font-semibold text-park-ink sm:text-base">
+            Bench {r.bench_code}
+            <span
+              className={cn(
+                "ml-1.5 inline-block align-middle rounded px-1 py-0.5 text-[9px] font-bold uppercase sm:ml-2 sm:px-1.5 sm:text-[10px]",
+                r.status === "cancelled"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-park-sage text-park-green",
+              )}
+            >
+              {r.status}
+            </span>
+          </p>
+          <p className="truncate text-xs text-park-muted sm:text-sm">
+            {r.firstName && r.lastName
+              ? `${r.firstName} ${r.lastName} (${r.username})`
+              : r.username}{" "}
+            · {formatYearRange(parseMonth(r.start_month).year, parseMonth(r.end_month).year)}
+            {r.donation_amount ? ` · $${r.donation_amount.toLocaleString()}` : ""}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5">
+          {r.plaque_message && (
+            <button
+              onClick={() => setShowPlaque((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-md border border-park-border px-2 py-1 text-[10px] font-bold text-amber-700 transition-colors hover:bg-amber-50 sm:text-xs"
+            >
+              {showPlaque ? <EyeOff className="size-3 sm:size-3.5" /> : <Eye className="size-3 sm:size-3.5" />}
+              Plaque
+            </button>
+          )}
+          {r.status === "active" && (
+            <CancelButton onClick={onCancel} />
+          )}
+          <DeleteButton onClick={onDelete} />
+        </div>
+      </div>
+      {showPlaque && r.plaque_message && (
+        <div className="px-3 pb-2.5 pl-9 sm:px-4 sm:pb-3 sm:pl-12">
+          <div
+            className="rounded-lg p-[4px]"
+            style={{
+              background:
+                "linear-gradient(145deg, #c9a84c, #a67c32 30%, #c9a84c 50%, #a67c32 70%, #c9a84c)",
+            }}
+          >
+            <div
+              className="rounded-[3px] border-2 px-3 py-2"
+              style={{
+                background:
+                  "linear-gradient(160deg, #b8942d, #d4af37 25%, #c9a84c 50%, #b8942d 75%, #d4af37)",
+                borderColor: "#8a6914",
+              }}
+            >
+              <p
+                className="whitespace-pre-line text-center font-serif text-xs leading-relaxed"
+                style={{ color: "#3d2e0a" }}
+              >
+                {r.plaque_message}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Create
 function CreateReservationPanel({
   users,
@@ -1431,17 +1492,17 @@ function CreateReservationPanel({
 }) {
   const router = useRouter();
   const year = currentYearNY();
-  const monthOptions = React.useMemo(() => {
-    const now = monthIndex(monthKey(year, new Date().getMonth() + 1));
-    return windowMonths(year).filter((m) => monthIndex(m) >= now);
-  }, [year]);
+  const yearOptions = React.useMemo(
+    () => windowYears(year),
+    [year],
+  );
 
   const [userQ, setUserQ] = React.useState("");
   const [userId, setUserId] = React.useState("");
   const [benchQ, setBenchQ] = React.useState("");
   const [benchId, setBenchId] = React.useState("");
-  const [start, setStart] = React.useState<Month>(monthOptions[0] ?? "");
-  const [end, setEnd] = React.useState<Month>(monthOptions[0] ?? "");
+  const [startYear, setStartYear] = React.useState(yearOptions[0]);
+  const [endYear, setEndYear] = React.useState(yearOptions[0]);
   const [submitting, setSubmitting] = React.useState(false);
 
   const userMatches = userQ
@@ -1462,8 +1523,8 @@ function CreateReservationPanel({
         .slice(0, 5)
     : [];
 
-  const count = start && end ? monthIndex(end) - monthIndex(start) + 1 : 0;
-  const validRange = count >= 1 && count <= 12;
+  const count = startYear && endYear ? endYear - startYear + 1 : 0;
+  const validRange = count >= 1 && count <= 10;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1472,15 +1533,15 @@ function CreateReservationPanel({
       return;
     }
     if (!validRange) {
-      toast.error("Choose a valid range of 1–12 consecutive months.");
+      toast.error("Choose a valid range of 1–10 consecutive years.");
       return;
     }
     setSubmitting(true);
     const res = await adminCreateReservation({
       userId,
       benchId,
-      startMonth: start,
-      endMonth: end,
+      startMonth: monthKey(startYear, 1),
+      endMonth: monthKey(endYear, 12),
     });
     setSubmitting(false);
     if (res.ok) {
@@ -1504,7 +1565,7 @@ function CreateReservationPanel({
         Create an adoption
       </h2>
       <p className="mb-4 mt-0.5 text-sm text-park-muted">
-        Link a reservation to an existing donor account.
+        Link an adoption to an existing donor account.
       </p>
       <form onSubmit={submit} className="flex flex-col gap-4">
         <Picker
@@ -1557,13 +1618,13 @@ function CreateReservationPanel({
 
         <label className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-park-ink">
-            Start month
+            Start year
           </span>
-          <MonthSelect value={start} onChange={setStart} options={monthOptions} />
+          <YearSelect value={startYear} onChange={setStartYear} options={yearOptions} />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-semibold text-park-ink">End month</span>
-          <MonthSelect value={end} onChange={setEnd} options={monthOptions} />
+          <span className="text-xs font-semibold text-park-ink">End year</span>
+          <YearSelect value={endYear} onChange={setEndYear} options={yearOptions} />
         </label>
 
         <p
@@ -1573,9 +1634,9 @@ function CreateReservationPanel({
           )}
         >
           {count > 0
-            ? `${count} consecutive ${count === 1 ? "month" : "months"} · within the 12-month limit`
-            : "Choose a start and end month."}
-          {!validRange && count > 12 && " — max is 12 months."}
+            ? `${count} consecutive ${count === 1 ? "year" : "years"} · within the 10-year limit`
+            : "Choose a start and end year."}
+          {!validRange && count > 10 && " — max is 10 years."}
         </p>
 
         <button
@@ -1584,7 +1645,7 @@ function CreateReservationPanel({
           className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-park-green px-5 text-sm font-bold text-white hover:bg-park-green/90 disabled:opacity-60"
         >
           {submitting && <Loader2 className="size-4 animate-spin" />}
-          Create reservation
+          Create adoption
         </button>
       </form>
     </section>
@@ -1636,24 +1697,24 @@ function Picker({
   );
 }
 
-function MonthSelect({
+function YearSelect({
   value,
   onChange,
   options,
 }: {
-  value: Month;
-  onChange: (m: Month) => void;
-  options: Month[];
+  value: number;
+  onChange: (y: number) => void;
+  options: number[];
 }) {
   return (
     <select
       value={value}
-      onChange={(e) => onChange(e.target.value as Month)}
+      onChange={(e) => onChange(Number(e.target.value))}
       className="h-9 rounded-md border border-park-border bg-park-bg/50 px-2 text-sm"
     >
-      {options.map((m) => (
-        <option key={m} value={m}>
-          {formatMonthLabel(m)}
+      {options.map((y) => (
+        <option key={y} value={y}>
+          {y}
         </option>
       ))}
     </select>

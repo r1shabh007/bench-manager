@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,8 @@ import { cn } from "@/lib/utils";
 import { REGION_LABEL, type ReservationRow, type SessionUser } from "@/lib/types";
 import { User } from "lucide-react";
 import {
-  diffMonths,
-  formatRangeCompact,
+  formatYearRange,
+  parseMonth,
   monthIndex,
   type Month,
 } from "@/lib/months";
@@ -147,7 +147,10 @@ function ReservationCard({
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const count = diffMonths(r.start_month, r.end_month) + 1;
+  const [showPlaque, setShowPlaque] = React.useState(false);
+  const startYear = parseMonth(r.start_month).year;
+  const endYear = parseMonth(r.end_month).year;
+  const count = endYear - startYear + 1;
 
   async function cancel() {
     setSubmitting(true);
@@ -155,7 +158,7 @@ function ReservationCard({
     setSubmitting(false);
     setConfirmOpen(false);
     if (res.ok) {
-      toast.success("Adoption cancelled. Future months are now available.");
+      toast.success("Adoption cancelled. Future years are now available.");
       router.refresh();
     } else {
       toast.error(res.error ?? "Could not cancel the adoption.");
@@ -177,14 +180,51 @@ function ReservationCard({
         <StatusBadge status={r.status} ended={count > 0 && !cancellable} />
       </div>
 
-      <div className="mt-4 flex gap-8 text-sm">
-        <Detail label="Dates">
-          {formatRangeCompact(r.start_month, r.end_month)}
+      <div className="mt-4 flex flex-wrap gap-8 text-sm">
+        <Detail label="Years">
+          {formatYearRange(startYear, endYear)}
         </Detail>
         <Detail label="Duration">
-          {count} {count === 1 ? "month" : "months"}
+          {count} {count === 1 ? "year" : "years"}
         </Detail>
+        {r.plaque_message && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowPlaque((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-md border border-park-border px-2 py-1 text-xs font-semibold text-park-green transition-colors hover:bg-park-sage/50"
+            >
+              {showPlaque ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+              Plaque
+            </button>
+          </div>
+        )}
       </div>
+
+      {showPlaque && r.plaque_message && (
+        <div
+          className="mt-3 rounded-lg p-[5px]"
+          style={{
+            background:
+              "linear-gradient(145deg, #c9a84c, #a67c32 30%, #c9a84c 50%, #a67c32 70%, #c9a84c)",
+          }}
+        >
+          <div
+            className="rounded-[3px] border-2 px-4 py-3"
+            style={{
+              background:
+                "linear-gradient(160deg, #b8942d, #d4af37 25%, #c9a84c 50%, #b8942d 75%, #d4af37)",
+              borderColor: "#8a6914",
+            }}
+          >
+            <p
+              className="whitespace-pre-line text-center font-serif text-xs leading-relaxed"
+              style={{ color: "#3d2e0a" }}
+            >
+              {r.plaque_message}
+            </p>
+          </div>
+        </div>
+      )}
 
       {cancellable && (
         <div className="mt-4 flex justify-end border-t border-park-border pt-4">
@@ -202,8 +242,8 @@ function ReservationCard({
           <DialogHeader>
             <DialogTitle>Cancel Bench {r.bench_code}?</DialogTitle>
             <DialogDescription>
-              This action can&apos;t be undone. The months{" "}
-              {formatRangeCompact(r.start_month, r.end_month)} that haven&apos;t
+              This action can&apos;t be undone. The years{" "}
+              {formatYearRange(startYear, endYear)} that haven&apos;t
               started yet will become available to others.
             </DialogDescription>
           </DialogHeader>

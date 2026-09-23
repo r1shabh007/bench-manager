@@ -18,7 +18,7 @@ export function BenchList() {
   const store = useReservationApi();
   const visible = useReservationStore(selectVisibleBenches);
   const selectedBenchId = useReservationStore((s) => s.selectedBenchId);
-  useReservationStore((s) => s.selectedMonths);
+  useReservationStore((s) => s.selectedYears);
   useReservationStore((s) => s.bookedByBench);
 
   const [asc, setAsc] = React.useState(true);

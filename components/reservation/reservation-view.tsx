@@ -6,10 +6,11 @@ import { MapLegend } from "@/components/bench-map/map-legend";
 import { RegionFilter } from "@/components/region-filter/region-filter";
 import { ViewToggle } from "@/components/reservation/view-toggle";
 import { MonthCalendar } from "@/components/month-calendar/month-calendar";
+import { DonationInput } from "@/components/donation/donation-input";
+import { PlaqueMessage } from "@/components/plaque/plaque-message";
 import { SelectedSummary } from "@/components/reserve-bar/selected-summary";
 import { ReserveBar } from "@/components/reserve-bar/reserve-bar";
 import { useReservationStore } from "@/components/reservation/reservation-provider";
-import { currentYearNY } from "@/lib/months";
 
 export function ReservationView({
   isLoggedIn,
@@ -19,7 +20,6 @@ export function ReservationView({
   hasActiveReservation?: boolean;
 }) {
   const view = useReservationStore((s) => s.view);
-  const year = currentYearNY();
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 sm:px-14">
@@ -37,7 +37,7 @@ export function ReservationView({
           <a href="/account" className="font-semibold underline underline-offset-2">
             account page
           </a>{" "}
-          to reserve a different bench.
+          to adopt a different bench.
         </div>
       )}
 
@@ -51,15 +51,17 @@ export function ReservationView({
           {view === "map" ? <BenchMap /> : <BenchList />}
           <MapLegend />
           <p className="rounded-xl border border-park-border bg-park-surface px-3 py-2 text-xs text-park-muted">
-            Benches are available by default unless fully adopted across {year}–
-            {year + 1}. Selecting an unavailable bench resets dates to show what
-            can be adopted.
+            Benches are available by default unless fully adopted. Selecting
+            an unavailable bench resets your selection to show what can be
+            adopted.
           </p>
         </div>
 
         <div className="flex flex-col gap-4">
           <SelectedSummary />
           <MonthCalendar />
+          <DonationInput />
+          <PlaqueMessage />
           <ReserveBar isLoggedIn={isLoggedIn} hasActiveReservation={hasActiveReservation} />
           {!isLoggedIn && (
             <p className="text-center text-xs text-park-rust sm:text-left">

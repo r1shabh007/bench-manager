@@ -69,17 +69,33 @@ export function currentYearNY(now: Date = new Date()): number {
 }
 
 /**
- * The 24-month reservation window: current calendar year plus the next calendar
- * year (Jan of current year through Dec of next year).
+ * All months in the adoption window: current year through 14 years ahead
+ * (15 calendar years total), to support up to 10-year adoptions.
  */
 export function windowMonths(currentYear: number): Month[] {
   const months: Month[] = [];
-  for (let y = currentYear; y <= currentYear + 1; y++) {
+  for (let y = currentYear; y < currentYear + 15; y++) {
     for (let mo = 1; mo <= 12; mo++) {
       months.push(monthKey(y, mo));
     }
   }
   return months;
+}
+
+/** The years shown in the adoption picker (current year + 14 more). */
+export function windowYears(currentYear: number): number[] {
+  return Array.from({ length: 15 }, (_, i) => currentYear + i);
+}
+
+/** All 12 months of a given year. */
+export function yearMonths(year: number): Month[] {
+  return Array.from({ length: 12 }, (_, i) => monthKey(year, i + 1));
+}
+
+/** Compact year range, e.g. "2026" or "2026–2028". */
+export function formatYearRange(startYear: number, endYear: number): string {
+  if (startYear === endYear) return `${startYear}`;
+  return `${startYear}–${endYear}`;
 }
 
 /** Months that can still be booked: the current month onward (past excluded). */

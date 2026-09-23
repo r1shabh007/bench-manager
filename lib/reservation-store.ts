@@ -6,12 +6,15 @@ import {
   currentMonthNY,
   currentYearNY,
   windowMonths,
-  isPast,
+  windowYears,
+  yearMonths,
   type Month,
 } from "./months";
 import { isBenchAvailable, type DotState } from "./availability";
-import { nextMonthSelection } from "./month-selection";
+import { nextYearSelection } from "./month-selection";
 import { type Bench, type Region } from "./types";
+
+export const PRICE_PER_YEAR = 4000;
 
 export type CalendarState = "available" | "unavailable" | "selected";
 
@@ -28,24 +31,30 @@ export interface ReservationInit {
 export interface ReservationState {
   benches: Bench[];
   currentMonth: Month;
+  currentYear: number;
   windowMonths: Month[];
+  windowYearList: number[];
   bookableWindow: Month[];
   bookedByBench: Map<string, Set<Month>>;
 
   selectedBenchId: string | null;
+  selectedYears: number[];
   selectedMonths: Month[];
   regionFilter: Record<Region, boolean>;
   view: "map" | "list";
 
-  // Non-blocking notice consumed by the UI (toast) then cleared.
+  donationAmount: number;
+  plaqueMessage: string;
+
   notice: string | null;
 
-  // actions
   selectBench: (id: string) => void;
-  toggleMonth: (month: Month) => void;
+  toggleYear: (year: number) => void;
   toggleRegion: (region: Region) => void;
   setView: (view: "map" | "list") => void;
   setBooked: (rows: BookedRow[]) => void;
+  setDonationAmount: (amount: number) => void;
+  setPlaqueMessage: (msg: string) => void;
   clearNotice: () => void;
   clearSelection: () => void;
 }
@@ -63,23 +72,42 @@ function buildBookedMap(rows: BookedRow[]): Map<string, Set<Month>> {
   return map;
 }
 
+function yearsToMonths(years: number[]): Month[] {
+  const sorted = [...years].sort((a, b) => a - b);
+  return sorted.flatMap(yearMonths);
+}
+
+function isYearBookedForBench(
+  year: number,
+  bookedMonths: Set<Month> | undefined,
+): boolean {
+  if (!bookedMonths) return false;
+  return yearMonths(year).some((m) => bookedMonths.has(m));
+}
+
 export function createReservationStore(init: ReservationInit) {
   const year = currentYearNY();
   const win = windowMonths(year);
   const current = currentMonthNY();
   const bookable = bookableMonths(win, current);
+  const yearList = windowYears(year);
 
   return createStore<ReservationState>((set, get) => ({
     benches: init.benches,
     currentMonth: current,
+    currentYear: year,
     windowMonths: win,
+    windowYearList: yearList,
     bookableWindow: bookable,
     bookedByBench: buildBookedMap(init.booked),
 
     selectedBenchId: null,
+    selectedYears: [],
     selectedMonths: [],
     regionFilter: { north: true, central: true, south: true },
     view: "map",
+    donationAmount: 0,
+    plaqueMessage: "",
     notice: null,
 
     selectBench: (id) => {
@@ -92,6 +120,7 @@ export function createReservationStore(init: ReservationInit) {
       if (bench?.restricted) {
         set({
           selectedBenchId: id,
+          selectedYears: [],
           selectedMonths: [],
           notice: `Bench ${bench.code} is currently unavailable.`,
         });
@@ -103,10 +132,11 @@ export function createReservationStore(init: ReservationInit) {
         state.selectedMonths,
         state.bookableWindow,
       );
-      if (state.selectedMonths.length > 0 && !availableForSelection) {
+      if (state.selectedYears.length > 0 && !availableForSelection) {
         const code = bench?.code ?? "";
         set({
           selectedBenchId: id,
+          selectedYears: [],
           selectedMonths: [],
           notice: `Dates reset to show when ${code} is available.`,
         });
@@ -115,27 +145,34 @@ export function createReservationStore(init: ReservationInit) {
       set({ selectedBenchId: id });
     },
 
-    toggleMonth: (month) => {
+    toggleYear: (clickedYear) => {
       const state = get();
       if (state.selectedBenchId) {
         const bench = state.benches.find((b) => b.id === state.selectedBenchId);
         if (bench?.restricted) return;
       }
-      const unavailable = new Set<Month>();
-      for (const m of state.windowMonths) {
-        if (isPast(m, state.currentMonth)) unavailable.add(m);
+      const unavailableYears = new Set<number>();
+      for (const y of state.windowYearList) {
+        if (y < state.currentYear) unavailableYears.add(y);
       }
       if (state.selectedBenchId) {
         const booked = state.bookedByBench.get(state.selectedBenchId);
-        if (booked) for (const m of booked) unavailable.add(m);
+        if (booked) {
+          for (const y of state.windowYearList) {
+            if (isYearBookedForBench(y, booked)) unavailableYears.add(y);
+          }
+        }
       }
-      const result = nextMonthSelection(
-        state.selectedMonths,
-        month,
-        unavailable,
+      const result = nextYearSelection(
+        state.selectedYears,
+        clickedYear,
+        unavailableYears,
       );
+      const newMin = result.years.length * PRICE_PER_YEAR;
       set({
-        selectedMonths: result.months,
+        selectedYears: result.years,
+        selectedMonths: yearsToMonths(result.years),
+        donationAmount: Math.max(state.donationAmount, newMin),
         notice: result.notice ?? state.notice,
       });
     },
@@ -143,8 +180,6 @@ export function createReservationStore(init: ReservationInit) {
     toggleRegion: (region) => {
       const state = get();
       const next = { ...state.regionFilter, [region]: !state.regionFilter[region] };
-
-      // If the selected bench is now hidden, deselect it.
       let selectedBenchId = state.selectedBenchId;
       if (selectedBenchId) {
         const bench = state.benches.find((b) => b.id === selectedBenchId);
@@ -157,9 +192,20 @@ export function createReservationStore(init: ReservationInit) {
 
     setBooked: (rows) => set({ bookedByBench: buildBookedMap(rows) }),
 
+    setDonationAmount: (amount) => set({ donationAmount: amount }),
+
+    setPlaqueMessage: (msg) => set({ plaqueMessage: msg }),
+
     clearNotice: () => set({ notice: null }),
 
-    clearSelection: () => set({ selectedBenchId: null, selectedMonths: [] }),
+    clearSelection: () =>
+      set({
+        selectedBenchId: null,
+        selectedYears: [],
+        selectedMonths: [],
+        donationAmount: 0,
+        plaqueMessage: "",
+      }),
   }));
 }
 
@@ -186,22 +232,26 @@ export function benchDot(state: ReservationState, benchId: string): DotState {
   return benchAvailability(state, benchId) ? "available" : "unavailable";
 }
 
-export function monthState(state: ReservationState, month: Month): CalendarState {
-  if (isPast(month, state.currentMonth)) return "unavailable";
+export function yearState(
+  state: ReservationState,
+  year: number,
+): CalendarState {
+  if (year < state.currentYear) return "unavailable";
   if (state.selectedBenchId) {
     const bench = state.benches.find((b) => b.id === state.selectedBenchId);
     if (bench?.restricted) return "unavailable";
     const booked = state.bookedByBench.get(state.selectedBenchId);
-    if (booked?.has(month)) return "unavailable";
+    if (isYearBookedForBench(year, booked)) return "unavailable";
   }
-  if (state.selectedMonths.includes(month)) return "selected";
+  if (state.selectedYears.includes(year)) return "selected";
   return "available";
 }
 
 export function reserveEnabled(state: ReservationState): boolean {
   return (
     state.selectedBenchId !== null &&
-    state.selectedMonths.length >= 1 &&
+    state.selectedYears.length >= 1 &&
+    state.donationAmount >= state.selectedYears.length * PRICE_PER_YEAR &&
     benchAvailability(state, state.selectedBenchId)
   );
 }

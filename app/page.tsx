@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { getBenches, getBookedMonths } from "@/lib/data";
+import { getBenches, getBookedMonths, getCurrentYearAdoptions } from "@/lib/data";
 import { getSessionUser } from "@/lib/auth";
 import { ReservationProvider } from "@/components/reservation/reservation-provider";
 import { BenchMap } from "@/components/bench-map/bench-map";
@@ -14,11 +14,14 @@ export const dynamic = "force-dynamic";
 
 
 export default async function HomePage() {
-  const [benches, booked, user] = await Promise.all([
+  const [benches, booked, user, adoptionsMap] = await Promise.all([
     getBenches(),
     getBookedMonths(),
     getSessionUser(),
+    getCurrentYearAdoptions(),
   ]);
+
+  const adoptions: Record<string, string> = Object.fromEntries(adoptionsMap);
 
   const availableCount = benches.filter((b) => !b.restricted).length;
 
@@ -81,8 +84,8 @@ export default async function HomePage() {
               <Calendar className="size-3.5 text-park-green sm:size-5" />
             </div>
             <div>
-              <p className="text-sm font-bold text-park-green sm:text-xl">1–12</p>
-              <p className="text-[10px] text-park-muted sm:text-xs">Months per adoption</p>
+              <p className="text-sm font-bold text-park-green sm:text-xl">1–10</p>
+              <p className="text-[10px] text-park-muted sm:text-xs">Years per adoption</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-3 sm:pl-12">
@@ -112,7 +115,7 @@ export default async function HomePage() {
         </div>
         <div className="overflow-hidden rounded-2xl border border-park-border/60 shadow-sm">
           <ReservationProvider init={{ benches, booked }}>
-            <BenchMap readOnly />
+            <BenchMap readOnly adoptions={adoptions} />
           </ReservationProvider>
         </div>
         <div className="flex justify-center pt-2">

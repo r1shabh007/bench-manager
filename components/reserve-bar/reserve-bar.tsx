@@ -15,19 +15,20 @@ import {
 import { useAuthModal } from "@/components/auth-modal/auth-modal-provider";
 import {
   reserveEnabled,
+  PRICE_PER_YEAR,
 } from "@/lib/reservation-store";
 import {
   useReservationStore,
   useReservationApi,
 } from "@/components/reservation/reservation-provider";
 import { REGION_LABEL } from "@/lib/types";
-import { formatRangeCompact, sortMonths, type Month } from "@/lib/months";
+import { formatYearRange, sortMonths } from "@/lib/months";
 import { createReservationAction } from "@/app/actions/reservations";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 const HELPER_TEXT =
-  "Select a bench and continuous blocks of time up to 1 year to adopt a bench.";
+  "Select a bench and 1–10 consecutive years to adopt a bench.";
 
 export function ReserveBar({
   isLoggedIn,
@@ -40,10 +41,11 @@ export function ReserveBar({
   const router = useRouter();
   const { open: openAuth } = useAuthModal();
 
-  // Subscribe so the button's enabled state stays live.
   useReservationStore((s) => s.selectedBenchId);
-  useReservationStore((s) => s.selectedMonths);
+  useReservationStore((s) => s.selectedYears);
   useReservationStore((s) => s.bookedByBench);
+  useReservationStore((s) => s.donationAmount);
+  useReservationStore((s) => s.plaqueMessage);
 
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
@@ -72,6 +74,8 @@ export function ReserveBar({
       benchId: s.selectedBenchId,
       startMonth: sorted[0],
       endMonth: sorted[sorted.length - 1],
+      plaqueMessage: s.plaqueMessage || undefined,
+      donationAmount: s.donationAmount || undefined,
     });
     setSubmitting(false);
     if (res.ok) {
@@ -90,8 +94,10 @@ export function ReserveBar({
     setDone(false);
   }
 
-  const sortedSelected = sortMonths(state.selectedMonths);
-  const rangeLabel = monthRangeLabel(sortedSelected);
+  const sortedYears = [...state.selectedYears].sort((a, b) => a - b);
+  const rangeLabel = yearRangeLabel(sortedYears);
+  const donation = state.donationAmount;
+  const plaqueMsg = state.plaqueMessage;
 
   return (
     <div className="flex flex-col items-center gap-1.5 sm:items-start">
@@ -151,7 +157,9 @@ export function ReserveBar({
                 <Row label="Bench">
                   {bench ? `${bench.code} · ${REGION_LABEL[bench.region]}` : "—"}
                 </Row>
-                <Row label="Months">{rangeLabel}</Row>
+                <Row label="Years">{rangeLabel}</Row>
+                <Row label="Donation">${donation.toLocaleString("en-US")}</Row>
+                {plaqueMsg && <Row label="Plaque">{plaqueMsg}</Row>}
               </dl>
               <DialogFooter>
                 <button
@@ -186,11 +194,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function monthRangeLabel(sorted: Month[]): string {
-  if (sorted.length === 0) return "—";
-  const start = sorted[0];
-  const end = sorted[sorted.length - 1];
-  const count = sorted.length;
-  const label = count === 1 ? "1 month" : `${count} months`;
-  return `${formatRangeCompact(start, end)}, ${label}`;
+function yearRangeLabel(sortedYears: number[]): string {
+  if (sortedYears.length === 0) return "—";
+  const count = sortedYears.length;
+  const label = count === 1 ? "1 year" : `${count} years`;
+  return `${formatYearRange(sortedYears[0], sortedYears[sortedYears.length - 1])}, ${label}`;
 }

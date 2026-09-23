@@ -34,7 +34,7 @@ export function ReservationProvider({
     const supabase = createClient();
     const year = currentYearNY();
     const start = `${year}-01-01`;
-    const end = `${monthKey(year + 1, 12)}-01`;
+    const end = `${monthKey(year + 14, 12)}-01`;
 
     async function refetch() {
       const { data } = await supabase

@@ -19,10 +19,11 @@ const TILE_URL = `https://api.maptiler.com/maps/streets-v4/256/{z}/{x}/{y}.png?k
 const ATTRIBUTION =
   '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
-const DOT_COLORS: Record<DotState, string> = {
+const DOT_COLORS: Record<DotState | "adopted", string> = {
   available: "#B85C5C",
   unavailable: "#6b7280",
   selected: "#FFD60A",
+  adopted: "#2d6a4f",
 };
 
 const DOT_Z: Record<DotState, number> = {
@@ -34,7 +35,7 @@ const DOT_Z: Record<DotState, number> = {
 const BOUNDS_SW: [number, number] = [40.8700, -73.9150];
 const BOUNDS_NE: [number, number] = [40.9250, -73.8580];
 
-export function BenchMap({ readOnly = false }: { readOnly?: boolean }) {
+export function BenchMap({ readOnly = false, adoptions }: { readOnly?: boolean; adoptions?: Record<string, string> }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<any>(null);
   const markersRef = React.useRef<Map<string, any>>(new Map());
@@ -43,7 +44,7 @@ export function BenchMap({ readOnly = false }: { readOnly?: boolean }) {
   const store = useReservationApi();
   const visible = useReservationStore(selectVisibleBenches);
   useReservationStore((s) => s.selectedBenchId);
-  useReservationStore((s) => s.selectedMonths);
+  useReservationStore((s) => s.selectedYears);
   useReservationStore((s) => s.bookedByBench);
 
   React.useEffect(() => {
@@ -113,19 +114,22 @@ export function BenchMap({ readOnly = false }: { readOnly?: boolean }) {
           updateMarkerColor(existing, dotState, bench);
           existing.setLatLng([bench.latitude, bench.longitude]);
         } else {
+          const isAdopted = adoptions ? bench.id in adoptions : false;
           const marker = createBenchMarker(
             L,
             bench,
             dotState,
             readOnly,
             () => store.getState().selectBench(bench.id),
+            isAdopted ? (adoptions![bench.id] || undefined) : undefined,
+            isAdopted,
           );
           marker.addTo(map);
           markers.set(bench.id, marker);
         }
       }
     });
-  }, [visible, ready, store, readOnly]);
+  }, [visible, ready, store, readOnly, adoptions]);
 
   React.useEffect(() => {
     if (!ready) return;
@@ -159,13 +163,16 @@ function createBenchMarker(
   state: DotState,
   readOnly: boolean,
   onClick: () => void,
+  plaqueMessage?: string,
+  isAdopted?: boolean,
 ) {
+  const dotColor = isAdopted ? DOT_COLORS.adopted : DOT_COLORS[state];
   const icon = L.divIcon({
     className: "",
     html: `<div class="bench-dot" style="
       width:14px;height:14px;border-radius:50%;
       border:2px solid rgba(255,255,255,0.85);
-      background:${DOT_COLORS[state]};
+      background:${dotColor};
       box-shadow:0 1px 3px rgba(0,0,0,0.3);
       transition:transform 0.15s,box-shadow 0.15s;
       cursor:${readOnly ? "default" : "pointer"};
@@ -183,7 +190,14 @@ function createBenchMarker(
     marker.on("click", onClick);
   }
 
-  marker.bindTooltip(bench.code, {
+  let tooltipContent = bench.code;
+  if (isAdopted && plaqueMessage) {
+    tooltipContent = `<strong>${bench.code}</strong> <span style="color:#2d6a4f;font-size:10px">Adopted</span><br/><span style="font-style:italic;font-size:11px;white-space:pre-line">${plaqueMessage.replace(/</g, "&lt;")}</span>`;
+  } else if (isAdopted) {
+    tooltipContent = `<strong>${bench.code}</strong> <span style="color:#2d6a4f;font-size:10px">Adopted</span>`;
+  }
+
+  marker.bindTooltip(tooltipContent, {
     direction: "top",
     offset: [0, -10],
     className: "bench-tooltip",

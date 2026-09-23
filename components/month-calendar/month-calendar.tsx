@@ -3,59 +3,39 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import {
-  monthState,
+  yearState,
   type CalendarState,
 } from "@/lib/reservation-store";
 import {
   useReservationStore,
   useReservationApi,
 } from "@/components/reservation/reservation-provider";
-import { currentYearNY, monthKey, monthShort, type Month } from "@/lib/months";
 
 export function MonthCalendar() {
   const store = useReservationApi();
-  // Re-render when selection or booked data changes.
-  useReservationStore((s) => s.selectedMonths);
+  useReservationStore((s) => s.selectedYears);
   useReservationStore((s) => s.selectedBenchId);
   useReservationStore((s) => s.bookedByBench);
 
-  const year = currentYearNY();
+  const years = useReservationStore((s) => s.windowYearList);
 
   const toggle = React.useCallback(
-    (month: Month) => store.getState().toggleMonth(month),
+    (year: number) => store.getState().toggleYear(year),
     [store],
   );
 
   return (
-    <div className="flex flex-col gap-5">
-      <CalendarYear year={year} onToggle={toggle} store={store} />
-      <CalendarYear year={year + 1} onToggle={toggle} store={store} />
-    </div>
-  );
-}
-
-function CalendarYear({
-  year,
-  onToggle,
-  store,
-}: {
-  year: number;
-  onToggle: (m: Month) => void;
-  store: ReturnType<typeof useReservationApi>;
-}) {
-  return (
     <div className="flex flex-col gap-2.5">
-      <h3 className="font-serif text-2xl text-park-green">{year}</h3>
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-        {Array.from({ length: 12 }, (_, i) => {
-          const month = monthKey(year, i + 1);
-          const state = monthState(store.getState(), month);
+      <h3 className="font-serif text-2xl text-park-green">Select years</h3>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+        {years.map((year) => {
+          const state = yearState(store.getState(), year);
           return (
-            <MonthBlock
-              key={month}
-              label={monthShort(i + 1)}
+            <YearBlock
+              key={year}
+              label={String(year)}
               state={state}
-              onClick={() => onToggle(month)}
+              onClick={() => toggle(year)}
             />
           );
         })}
@@ -64,7 +44,7 @@ function CalendarYear({
   );
 }
 
-function MonthBlock({
+function YearBlock({
   label,
   state,
   onClick,

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
+import { currentMonthNY } from "@/lib/months";
 
 export interface ReserveResult {
   ok: boolean;
@@ -19,6 +20,8 @@ export async function createReservationAction(input: {
   benchId: string;
   startMonth: string; // 'YYYY-MM'
   endMonth: string; // 'YYYY-MM'
+  plaqueMessage?: string;
+  donationAmount?: number;
 }): Promise<ReserveResult> {
   const user = await getSessionUser();
   if (!user) {
@@ -41,10 +44,13 @@ export async function createReservationAction(input: {
       };
     }
   }
+  const curMonth = currentMonthNY();
+  const startMonth = input.startMonth < curMonth ? curMonth : input.startMonth;
+
   const { data, error } = await supabase.rpc("create_reservation", {
     p_user_id: user.id,
     p_bench_id: input.benchId,
-    p_start: `${input.startMonth}-01`,
+    p_start: `${startMonth}-01`,
     p_end: `${input.endMonth}-01`,
   });
 
@@ -52,10 +58,21 @@ export async function createReservationAction(input: {
     return { ok: false, error: friendlyError(error.message) };
   }
 
+  const reservationId = data as string;
+  if (input.plaqueMessage || input.donationAmount) {
+    const updates: Record<string, unknown> = {};
+    if (input.plaqueMessage) updates.plaque_message = input.plaqueMessage;
+    if (input.donationAmount) updates.donation_amount = input.donationAmount;
+    await supabase
+      .from("reservations")
+      .update(updates)
+      .eq("id", reservationId);
+  }
+
   revalidatePath("/reservation");
   revalidatePath("/account");
   revalidatePath("/");
-  return { ok: true, reservationId: data as string };
+  return { ok: true, reservationId };
 }
 
 /** Cancel one of the current user's reservations (ownership re-checked in DB). */
