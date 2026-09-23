@@ -22,7 +22,7 @@ export async function createReservationAction(input: {
 }): Promise<ReserveResult> {
   const user = await getSessionUser();
   if (!user) {
-    return { ok: false, error: "You must be logged in to reserve a bench." };
+    return { ok: false, error: "You must be logged in to adopt a bench." };
   }
 
   const supabase = await createClient();
@@ -37,7 +37,7 @@ export async function createReservationAction(input: {
       return {
         ok: false,
         error:
-          "You can only reserve one bench at a time. Cancel your current reservation to reserve a different bench.",
+          "You can only adopt one bench at a time. Cancel your current adoption to adopt a different bench.",
       };
     }
   }

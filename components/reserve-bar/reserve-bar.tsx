@@ -27,7 +27,7 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 const HELPER_TEXT =
-  "Select a bench and continuous blocks of time up to 1 year to reserve a bench.";
+  "Select a bench and continuous blocks of time up to 1 year to adopt a bench.";
 
 export function ReserveBar({
   isLoggedIn,
@@ -80,7 +80,7 @@ export function ReserveBar({
       router.refresh();
     } else {
       setConfirmOpen(false);
-      toast.error(res.error ?? "Could not complete the reservation.");
+      toast.error(res.error ?? "Could not complete the adoption.");
       router.refresh();
     }
   }
@@ -106,7 +106,7 @@ export function ReserveBar({
             : "cursor-not-allowed bg-park-border/70 text-park-muted",
         )}
       >
-        {bench ? `Reserve bench ${bench.code}` : "Reserve a bench"}
+        {bench ? `Adopt bench ${bench.code}` : "Adopt a bench"}
       </button>
       {!enabled && <p className="text-center text-xs text-park-muted sm:text-left">{HELPER_TEXT}</p>}
 
@@ -118,7 +118,7 @@ export function ReserveBar({
           {done ? (
             <div className="flex flex-col items-center gap-3 py-2 text-center">
               <CheckCircle2 className="size-10 text-park-green" />
-              <DialogTitle>Bench reserved</DialogTitle>
+              <DialogTitle>Bench adopted</DialogTitle>
               <DialogDescription>
                 Your adoption is confirmed. You can view and manage it from your
                 account.

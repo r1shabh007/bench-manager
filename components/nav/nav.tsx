@@ -26,7 +26,7 @@ export function Nav({ user }: { user: SessionUser | null }) {
 
   const links: { href: string; label: string }[] = [
     { href: "/", label: "Home" },
-    { href: "/reservation", label: "Reservation" },
+    { href: "/reservation", label: "Adoption" },
     { href: "/account", label: "Account" },
   ];
   if (user?.isAdmin) links.push({ href: "/admin", label: "Admin" });

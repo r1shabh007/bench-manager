@@ -81,12 +81,12 @@ export function AccountView({
         </div>
       )}
 
-      <Section title="Active reservation">
+      <Section title="Active adoption">
         {active.length === 0 ? (
           <EmptyState>
             You have no active adoptions yet.{" "}
             <Link href="/reservation" className="font-semibold text-park-green underline">
-              Reserve a bench
+              Adopt a bench
             </Link>
             .
           </EmptyState>
@@ -99,7 +99,7 @@ export function AccountView({
         )}
       </Section>
 
-      <Section title="Previous reservations">
+      <Section title="Previous adoptions">
         {previous.length === 0 ? (
           <EmptyState>Past and cancelled adoptions will appear here.</EmptyState>
         ) : (
@@ -155,10 +155,10 @@ function ReservationCard({
     setSubmitting(false);
     setConfirmOpen(false);
     if (res.ok) {
-      toast.success("Reservation cancelled. Future months are now available.");
+      toast.success("Adoption cancelled. Future months are now available.");
       router.refresh();
     } else {
-      toast.error(res.error ?? "Could not cancel the reservation.");
+      toast.error(res.error ?? "Could not cancel the adoption.");
     }
   }
 
@@ -192,7 +192,7 @@ function ReservationCard({
             onClick={() => setConfirmOpen(true)}
             className="inline-flex h-11 items-center justify-center rounded-full bg-destructive px-5 text-sm font-bold text-white transition-colors hover:bg-destructive/90"
           >
-            Cancel reservation
+            Cancel adoption
           </button>
         </div>
       )}
@@ -212,7 +212,7 @@ function ReservationCard({
               onClick={() => setConfirmOpen(false)}
               className="inline-flex h-11 items-center justify-center rounded-full border border-park-border px-5 text-sm font-semibold text-park-green hover:bg-park-sage/50"
             >
-              Keep reservation
+              Keep adoption
             </button>
             <button
               onClick={cancel}

@@ -18,18 +18,18 @@ A desktop and mobile web app for Van Cortlandt Park's bench adoption program. Ov
 ## Pages
 
 ### Home `/`
-Landing page with a park map preview, bench count, and a call-to-action directing visitors to the reservation flow.
+Landing page with a park map preview, bench count, and a call-to-action directing visitors to the adoption flow.
 
-### Reservation `/reservation`
-Interactive bench selection and booking. Users browse benches on a Leaflet map or a list view, filter by region (North / Central / South), pick available months on a calendar, and confirm their reservation. One active reservation per user at a time.
+### Adoption `/reservation`
+Interactive bench selection and booking. Users browse benches on a Leaflet map or a list view, filter by region (North / Central / South), pick available months on a calendar, and confirm their adoption. One active adoption per user at a time.
 
 ### Account `/account`
-Authenticated users can view their active and past reservations, cancel a current adoption, and manage their profile.
+Authenticated users can view their active and past adoptions, cancel a current adoption, and manage their profile.
 
 ### Admin `/admin`
 Protected admin dashboard with three sections:
 - **User management** — search, view, and remove user accounts.
-- **Reservation management** — filter by status, cancel or delete any reservation.
+- **Adoption management** — filter by status, cancel or delete any adoption.
 - **Bench management** — add, move, restrict, or delete benches. Inline editing of bench codes and regions. Batch operations (restrict, unrestrict, delete) on selected benches.
 - **Admin map** — visual bench editor with drag-to-move, click-to-select, and coordinate editing.
 
@@ -40,16 +40,16 @@ Login, sign-up, and forgot-password flows rendered in a modal overlay from any p
 
 ```
 app/                  → Next.js routes and server actions
-  actions/            → Server actions (auth, reservations, admin)
+  actions/            → Server actions (auth, adoptions, admin)
   account/            → Account page
   admin/              → Admin dashboard
-  reservation/        → Reservation page
+  reservation/        → Adoption page
 components/           → React components
   admin/              → Admin view + admin bench map
   bench-map/          → Public Leaflet map
   bench-list/         → List-view alternative to the map
   month-calendar/     → Month picker calendar
-  reserve-bar/        → Reservation confirmation bar
+  reserve-bar/        → Adoption confirmation bar
   nav/                → Site navigation
   auth-modal/         → Login / sign-up modal
   ui/                 → Shared UI primitives

@@ -49,7 +49,7 @@ export function AuthModal({
           {!awaitingConfirm && (
             <p className="text-sm text-park-muted">
               {tab === "login"
-                ? "Log in to reserve a bench or view your adoptions."
+                ? "Log in to adopt a bench or view your adoptions."
                 : "Sign up to adopt a bench in Van Cortlandt Park."}
             </p>
           )}

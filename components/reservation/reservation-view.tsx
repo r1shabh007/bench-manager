@@ -27,13 +27,13 @@ export function ReservationView({
         <p className="text-xs font-bold uppercase tracking-wide text-park-rust">
           Bench adoption
         </p>
-        <h1 className="font-serif text-4xl text-park-green">Reserve a bench</h1>
+        <h1 className="font-serif text-4xl text-park-green">Adopt a bench</h1>
       </div>
 
       {hasActiveReservation && (
         <div className="mt-4 rounded-xl border border-park-rust/30 bg-park-rust/5 px-4 py-3 text-sm text-park-rust">
-          You already have an active reservation. You can only reserve one bench at a time.
-          Cancel your current reservation from your{" "}
+          You already have an active adoption. You can only adopt one bench at a time.
+          Cancel your current adoption from your{" "}
           <a href="/account" className="font-semibold underline underline-offset-2">
             account page
           </a>{" "}
@@ -51,9 +51,9 @@ export function ReservationView({
           {view === "map" ? <BenchMap /> : <BenchList />}
           <MapLegend />
           <p className="rounded-xl border border-park-border bg-park-surface px-3 py-2 text-xs text-park-muted">
-            Benches are available by default unless fully booked across {year}–
+            Benches are available by default unless fully adopted across {year}–
             {year + 1}. Selecting an unavailable bench resets dates to show what
-            can be booked.
+            can be adopted.
           </p>
         </div>
 
@@ -63,7 +63,7 @@ export function ReservationView({
           <ReserveBar isLoggedIn={isLoggedIn} hasActiveReservation={hasActiveReservation} />
           {!isLoggedIn && (
             <p className="text-center text-xs text-park-rust sm:text-left">
-              You&apos;ll be asked to log in before completing this reservation.
+              You&apos;ll be asked to log in before completing this adoption.
             </p>
           )}
         </div>

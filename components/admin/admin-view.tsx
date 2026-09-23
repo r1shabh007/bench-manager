@@ -299,7 +299,7 @@ function AdminBenchMapSection({
         open={batchDeleteOpen}
         onOpenChange={(o) => !o && setBatchDeleteOpen(false)}
         title={`Delete ${pendingIds.length} bench${pendingIds.length === 1 ? "" : "es"}?`}
-        description="This permanently removes the selected benches and their reservations."
+        description="This permanently removes the selected benches and their adoptions."
         confirmLabel={`Delete ${pendingIds.length} bench${pendingIds.length === 1 ? "" : "es"}`}
         destructive
         onConfirm={handleBatchDelete}
@@ -440,7 +440,7 @@ function UserManagement({
               <div className="flex items-center gap-3">
                 <span className="hidden text-sm text-park-muted sm:block">
                   {u.reservation_count}{" "}
-                  {u.reservation_count === 1 ? "reservation" : "reservations"}
+                  {u.reservation_count === 1 ? "adoption" : "adoptions"}
                 </span>
                 {u.id === meId || u.is_admin ? (
                   <span className="text-xs text-park-muted">—</span>
@@ -457,7 +457,7 @@ function UserManagement({
         open={Boolean(target)}
         onOpenChange={(o) => !o && setTarget(null)}
         title={`Delete ${target?.username ?? "user"}?`}
-        description="This permanently deletes the user and all of their reservations. This cannot be undone."
+        description="This permanently deletes the user and all of their adoptions. This cannot be undone."
         confirmLabel="Delete user"
         destructive
         onConfirm={remove}
@@ -1099,7 +1099,7 @@ function BenchManagement({
         open={Boolean(deleteTarget)}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
         title={`Remove bench ${deleteTarget?.code ?? ""}?`}
-        description="The bench will no longer be available for adoption. Existing reservations are removed too."
+        description="The bench will no longer be available for adoption. Existing adoptions are removed too."
         confirmLabel="Remove bench"
         destructive
         onConfirm={removeSingle}
@@ -1108,7 +1108,7 @@ function BenchManagement({
         open={batchDeleteOpen}
         onOpenChange={(o) => !o && setBatchDeleteOpen(false)}
         title={`Delete ${selectedIds.size} bench${selectedIds.size === 1 ? "" : "es"}?`}
-        description="This permanently removes the selected benches and their reservations."
+        description="This permanently removes the selected benches and their adoptions."
         confirmLabel={`Delete ${selectedIds.size} bench${selectedIds.size === 1 ? "" : "es"}`}
         destructive
         onConfirm={batchDelete}
@@ -1211,10 +1211,10 @@ function ReservationManagement({
         next.delete(deleteTarget.id);
         return next;
       });
-      toast.success("Reservation deleted.");
+      toast.success("Adoption deleted.");
       router.refresh();
     } else {
-      toast.error(res.error ?? "Could not delete reservation.");
+      toast.error(res.error ?? "Could not delete adoption.");
     }
   }
 
@@ -1222,10 +1222,10 @@ function ReservationManagement({
     if (!cancelTarget) return;
     const res = await adminCancelReservation(cancelTarget.id);
     if (res.ok) {
-      toast.success("Reservation cancelled.");
+      toast.success("Adoption cancelled.");
       router.refresh();
     } else {
-      toast.error(res.error ?? "Could not cancel reservation.");
+      toast.error(res.error ?? "Could not cancel adoption.");
     }
   }
 
@@ -1238,12 +1238,12 @@ function ReservationManagement({
     setBatchDeleteOpen(false);
     if (res.ok) {
       toast.success(
-        `Deleted ${res.deletedCount} reservation${res.deletedCount === 1 ? "" : "s"}.`,
+        `Deleted ${res.deletedCount} adoption${res.deletedCount === 1 ? "" : "s"}.`,
       );
       setSelected(new Set());
       router.refresh();
     } else {
-      toast.error(res.error ?? "Could not delete reservations.");
+      toast.error(res.error ?? "Could not delete adoptions.");
     }
   }
 
@@ -1258,16 +1258,16 @@ function ReservationManagement({
     setBatchCancelOpen(false);
     if (res.ok) {
       toast.success(
-        `Cancelled ${res.cancelledCount} reservation${res.cancelledCount === 1 ? "" : "s"}.`,
+        `Cancelled ${res.cancelledCount} adoption${res.cancelledCount === 1 ? "" : "s"}.`,
       );
       router.refresh();
     } else {
-      toast.error(res.error ?? "Could not cancel reservations.");
+      toast.error(res.error ?? "Could not cancel adoptions.");
     }
   }
 
   return (
-    <Panel title="Reservation management">
+    <Panel title="Adoption management">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <select
           value={status}
@@ -1295,7 +1295,7 @@ function ReservationManagement({
       </div>
       <div className="min-h-[320px] max-h-[320px] overflow-auto rounded-xl border border-park-border">
         {filtered.length === 0 ? (
-          <p className="p-4 text-sm text-park-muted">No reservations found.</p>
+          <p className="p-4 text-sm text-park-muted">No adoptions found.</p>
         ) : (
           <>
             <div className="sticky top-0 z-10 flex h-10 items-center gap-2 border-b border-park-border bg-park-sage/90 px-4">
@@ -1376,30 +1376,30 @@ function ReservationManagement({
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(o) => !o && setDeleteTarget(null)}
-        title="Delete reservation?"
-        description="This hard-deletes the reservation. This cannot be undone."
-        confirmLabel="Delete reservation"
+        title="Delete adoption?"
+        description="This hard-deletes the adoption. This cannot be undone."
+        confirmLabel="Delete adoption"
         destructive
         onConfirm={removeSingle}
       />
       <ConfirmDialog
         open={Boolean(cancelTarget)}
         onOpenChange={(o) => !o && setCancelTarget(null)}
-        title="Cancel reservation?"
-        description="This marks the reservation as cancelled. The bench will become available for others."
-        confirmLabel="Cancel reservation"
+        title="Cancel adoption?"
+        description="This marks the adoption as cancelled. The bench will become available for others."
+        confirmLabel="Cancel adoption"
         destructive
         onConfirm={cancelSingle}
       />
       <ConfirmDialog
         open={batchDeleteOpen}
         onOpenChange={(o) => !o && setBatchDeleteOpen(false)}
-        title={`Delete ${selected.size} reservation${selected.size === 1 ? "" : "s"}?`}
-        description="This hard-deletes all selected reservations. This cannot be undone."
+        title={`Delete ${selected.size} adoption${selected.size === 1 ? "" : "s"}?`}
+        description="This hard-deletes all selected adoptions. This cannot be undone."
         confirmLabel={
           batchDeleting
             ? "Deleting…"
-            : `Delete ${selected.size} reservation${selected.size === 1 ? "" : "s"}`
+            : `Delete ${selected.size} adoption${selected.size === 1 ? "" : "s"}`
         }
         destructive
         onConfirm={batchRemove}
@@ -1407,12 +1407,12 @@ function ReservationManagement({
       <ConfirmDialog
         open={batchCancelOpen}
         onOpenChange={(o) => !o && setBatchCancelOpen(false)}
-        title={`Cancel ${selectedActiveCount} active reservation${selectedActiveCount === 1 ? "" : "s"}?`}
-        description="This marks the selected active reservations as cancelled. Their benches will become available for others."
+        title={`Cancel ${selectedActiveCount} active adoption${selectedActiveCount === 1 ? "" : "s"}?`}
+        description="This marks the selected active adoptions as cancelled. Their benches will become available for others."
         confirmLabel={
           batchCancelling
             ? "Cancelling…"
-            : `Cancel ${selectedActiveCount} reservation${selectedActiveCount === 1 ? "" : "s"}`
+            : `Cancel ${selectedActiveCount} adoption${selectedActiveCount === 1 ? "" : "s"}`
         }
         destructive
         onConfirm={batchCancel}
@@ -1484,14 +1484,14 @@ function CreateReservationPanel({
     });
     setSubmitting(false);
     if (res.ok) {
-      toast.success("Reservation created.");
+      toast.success("Adoption created.");
       setUserId("");
       setUserQ("");
       setBenchId("");
       setBenchQ("");
       router.refresh();
     } else {
-      toast.error(res.error ?? "Could not create reservation.");
+      toast.error(res.error ?? "Could not create adoption.");
     }
   }
 
@@ -1501,7 +1501,7 @@ function CreateReservationPanel({
   return (
     <section className="h-fit overflow-hidden rounded-2xl border border-park-border bg-park-surface p-5">
       <h2 className="text-lg font-bold text-park-green">
-        Create a reservation
+        Create an adoption
       </h2>
       <p className="mb-4 mt-0.5 text-sm text-park-muted">
         Link a reservation to an existing donor account.

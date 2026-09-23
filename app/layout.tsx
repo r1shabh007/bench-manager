@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Van Cortlandt Park Bench Adoption",
   description:
-    "Adopt a bench in Van Cortlandt Park. Reserve consecutive months and support the places where neighbors rest.",
+    "Adopt a bench in Van Cortlandt Park. Choose consecutive months and support the places where neighbors rest.",
 };
 
 const inter = Inter({

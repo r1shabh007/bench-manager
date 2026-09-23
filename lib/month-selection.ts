@@ -17,7 +17,7 @@ export interface SelectionResult {
 }
 
 export const MAX_MONTHS = 12;
-export const LIMIT_NOTICE = "Reservations are limited to 12 months.";
+export const LIMIT_NOTICE = "Adoptions are limited to 12 months.";
 
 export function nextMonthSelection(
   current: Month[],
