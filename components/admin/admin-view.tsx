@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Trash2, XCircle, X, Lock, Unlock, Pencil, Check, Move } from "lucide-react";
+import { Loader2, Trash2, XCircle, X, Lock, Unlock, Pencil, Check, Move, ChevronDown } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -58,6 +58,14 @@ export function AdminView({
     new Set(),
   );
   const [mapMoveId, setMapMoveId] = React.useState<string | null>(null);
+  const [regionFilter, setRegionFilter] = React.useState<Record<Region, boolean>>({
+    north: true,
+    central: true,
+    south: true,
+  });
+  function toggleRegion(r: Region) {
+    setRegionFilter((prev) => ({ ...prev, [r]: !prev[r] }));
+  }
   const prevSelectedRef = React.useRef<Set<string>>(new Set());
   function handleStartMove(benchId: string) {
     prevSelectedRef.current = new Set(selectedBenchIds);
@@ -95,7 +103,7 @@ export function AdminView({
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-5 py-8 sm:px-10">
+    <div className="mx-auto max-w-7xl overflow-x-hidden px-5 py-8 sm:px-10">
       <p className="text-xs font-bold uppercase tracking-wide text-park-rust">
         Authenticated admin workspace
       </p>
@@ -125,6 +133,9 @@ export function AdminView({
           movingBenchId={mapMoveId}
           onStartMove={handleStartMove}
           onMoveComplete={handleMoveComplete}
+          regionFilter={regionFilter}
+          onToggleRegion={toggleRegion}
+          onSetRegionFilter={setRegionFilter}
         />
         <AdminBenchMapSection
           benches={benches}
@@ -134,6 +145,8 @@ export function AdminView({
           externalMoveId={mapMoveId}
           onStartMove={handleStartMove}
           onMoveComplete={handleMoveComplete}
+          regionFilter={regionFilter}
+          onToggleRegion={toggleRegion}
         />
       </div>
 
@@ -149,6 +162,8 @@ function AdminBenchMapSection({
   externalMoveId,
   onStartMove,
   onMoveComplete,
+  regionFilter,
+  onToggleRegion,
 }: {
   benches: Bench[];
   selectedIds: Set<string>;
@@ -157,6 +172,8 @@ function AdminBenchMapSection({
   externalMoveId: string | null;
   onStartMove: (benchId: string) => void;
   onMoveComplete: () => void;
+  regionFilter: Record<Region, boolean>;
+  onToggleRegion: (r: Region) => void;
 }) {
   const router = useRouter();
   const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
@@ -232,10 +249,30 @@ function AdminBenchMapSection({
     }
   }
 
+  const filteredBenches = benches.filter((b) => regionFilter[b.region]);
+
   return (
     <Panel title="Map">
+      <div className="mb-3 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by park area">
+        {REGIONS.map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => onToggleRegion(r)}
+            aria-pressed={regionFilter[r]}
+            className={cn(
+              "rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors",
+              regionFilter[r]
+                ? "border-park-green bg-park-green text-white"
+                : "border-park-border bg-park-surface text-park-muted hover:border-park-green hover:text-park-green",
+            )}
+          >
+            {REGION_LABEL[r]}
+          </button>
+        ))}
+      </div>
       <AdminBenchMap
-        benches={benches}
+        benches={filteredBenches}
         selectedIds={selectedIds}
         onToggleSelect={onToggleSelect}
         onUpdateCoordinates={handleUpdateCoordinates}
@@ -298,7 +335,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-park-border bg-park-surface p-5">
+    <section className="overflow-hidden rounded-2xl border border-park-border bg-park-surface p-5">
       <h2 className="text-lg font-bold text-park-green">{title}</h2>
       {description && (
         <p className="mb-3 mt-0.5 text-sm text-park-muted">{description}</p>
@@ -314,13 +351,13 @@ function DeleteButton({ onClick, disabled }: { onClick: () => void; disabled?: b
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+        "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-colors sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs",
         disabled
           ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
           : "bg-destructive/10 text-destructive hover:bg-destructive/20",
       )}
     >
-      <Trash2 className="size-3.5" /> Delete
+      <Trash2 className="size-3 sm:size-3.5" /> Delete
     </button>
   );
 }
@@ -329,9 +366,9 @@ function CancelButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-700 transition-colors hover:bg-amber-500/20"
+      className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-1 text-[10px] font-bold text-amber-700 transition-colors hover:bg-amber-500/20 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs"
     >
-      <XCircle className="size-3.5" /> Cancel
+      <XCircle className="size-3 sm:size-3.5" /> Cancel
     </button>
   );
 }
@@ -348,11 +385,14 @@ function UserManagement({
   const [query, setQuery] = React.useState("");
   const [target, setTarget] = React.useState<AdminUserRow | null>(null);
 
-  const filtered = users.filter(
-    (u) =>
-      u.username.toLowerCase().includes(query.toLowerCase()) ||
-      u.email.toLowerCase().includes(query.toLowerCase()),
-  );
+  const filtered = users.filter((u) => {
+    const q = query.toLowerCase();
+    return (
+      u.username.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      `${u.first_name} ${u.last_name}`.toLowerCase().includes(q)
+    );
+  });
 
   async function remove() {
     if (!target) return;
@@ -368,7 +408,7 @@ function UserManagement({
   return (
     <Panel title="User management">
       <Input
-        placeholder="Search by username or email"
+        placeholder="Search by name, username, or email"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className="mb-3 bg-park-bg/50"
@@ -384,14 +424,18 @@ function UserManagement({
             >
               <div className="min-w-0">
                 <p className="truncate font-semibold text-park-ink">
-                  {u.username}
+                  {u.first_name && u.last_name
+                    ? `${u.first_name} ${u.last_name}`
+                    : u.username}
                   {u.is_admin && (
-                    <span className="ml-2 rounded bg-park-sage px-1.5 py-0.5 text-[10px] font-bold uppercase text-park-green">
+                    <span className="ml-2 inline-block align-middle rounded bg-park-sage px-1.5 py-0.5 text-[10px] font-bold uppercase text-park-green">
                       Admin
                     </span>
                   )}
                 </p>
-                <p className="truncate text-sm text-park-muted">{u.email}</p>
+                <p className="truncate text-sm text-park-muted">
+                  {u.username} · {u.email}
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="hidden text-sm text-park-muted sm:block">
@@ -431,6 +475,9 @@ function BenchManagement({
   movingBenchId,
   onStartMove,
   onMoveComplete,
+  regionFilter,
+  onToggleRegion,
+  onSetRegionFilter,
 }: {
   benches: Bench[];
   selectedIds: Set<string>;
@@ -439,6 +486,9 @@ function BenchManagement({
   movingBenchId: string | null;
   onStartMove: (benchId: string) => void;
   onMoveComplete: () => void;
+  regionFilter: Record<Region, boolean>;
+  onToggleRegion: (r: Region) => void;
+  onSetRegionFilter: (v: Record<Region, boolean>) => void;
 }) {
   const router = useRouter();
   const [code, setCode] = React.useState("");
@@ -447,8 +497,20 @@ function BenchManagement({
   const [lng, setLng] = React.useState("");
   const [adding, setAdding] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const [regionFilter, setRegionFilter] = React.useState<Region | "all">("all");
+  const [regionDropdownOpen, setRegionDropdownOpen] = React.useState(false);
+  const regionDropdownRef = React.useRef<HTMLDivElement>(null);
   const [showSelectedOnly, setShowSelectedOnly] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!regionDropdownOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (regionDropdownRef.current && !regionDropdownRef.current.contains(e.target as Node)) {
+        setRegionDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [regionDropdownOpen]);
   const [deleteTarget, setDeleteTarget] = React.useState<Bench | null>(null);
   const [batchDeleteOpen, setBatchDeleteOpen] = React.useState(false);
   const [batchRestrictOpen, setBatchRestrictOpen] = React.useState(false);
@@ -462,8 +524,8 @@ function BenchManagement({
     if (!movingBenchId) return;
     const bench = benches.find((b) => b.id === movingBenchId);
     if (bench) {
-      setMoveLat(bench.latitude.toFixed(6));
-      setMoveLng(bench.longitude.toFixed(6));
+      setMoveLat(bench.latitude.toFixed(9));
+      setMoveLng(bench.longitude.toFixed(9));
     }
     requestAnimationFrame(() => {
       const container = listRef.current;
@@ -501,7 +563,7 @@ function BenchManagement({
 
   const filtered = benches.filter((b) => {
     if (showSelectedOnly && !selectedIds.has(b.id)) return false;
-    if (regionFilter !== "all" && b.region !== regionFilter) return false;
+    if (!regionFilter[b.region]) return false;
     if (query && !b.code.toLowerCase().includes(query.toLowerCase())) return false;
     return true;
   });
@@ -649,24 +711,24 @@ function BenchManagement({
       {/* Add form */}
       <form
         onSubmit={add}
-        className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end"
+        className="mb-3 flex flex-col gap-2 sm:mb-4 sm:flex-row sm:items-end sm:gap-3"
       >
-        <label className="flex flex-col gap-1 sm:w-28">
-          <span className="text-xs font-semibold text-park-ink">Code</span>
+        <label className="flex flex-col gap-0.5 sm:w-28 sm:gap-1">
+          <span className="text-[10px] font-semibold text-park-ink sm:text-xs">Code</span>
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="N8"
             required
-            className="bg-park-bg/50"
+            className="h-7 bg-park-bg/50 text-xs sm:h-9 sm:text-sm"
           />
         </label>
-        <label className="flex flex-col gap-1 sm:w-32">
-          <span className="text-xs font-semibold text-park-ink">Region</span>
+        <label className="flex flex-col gap-0.5 sm:w-32 sm:gap-1">
+          <span className="text-[10px] font-semibold text-park-ink sm:text-xs">Region</span>
           <select
             value={region}
             onChange={(e) => setRegion(e.target.value as Region)}
-            className="h-9 rounded-md border border-park-border bg-park-bg/50 px-2 text-sm"
+            className="h-7 rounded-md border border-park-border bg-park-bg/50 px-1.5 text-xs sm:h-9 sm:px-2 sm:text-sm"
           >
             {REGIONS.map((r) => (
               <option key={r} value={r}>
@@ -675,51 +737,51 @@ function BenchManagement({
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 sm:w-32">
-          <span className="text-xs font-semibold text-park-ink">Latitude</span>
+        <label className="flex flex-col gap-0.5 sm:w-32 sm:gap-1">
+          <span className="text-[10px] font-semibold text-park-ink sm:text-xs">Latitude</span>
           <Input
             type="number"
             step="any"
             value={lat}
             onChange={(e) => setLat(e.target.value)}
-            placeholder="40.8960"
-            className="bg-park-bg/50"
+            placeholder="40.896000000"
+            className="h-7 bg-park-bg/50 text-xs sm:h-9 sm:text-sm"
           />
         </label>
-        <label className="flex flex-col gap-1 sm:w-32">
-          <span className="text-xs font-semibold text-park-ink">Longitude</span>
+        <label className="flex flex-col gap-0.5 sm:w-32 sm:gap-1">
+          <span className="text-[10px] font-semibold text-park-ink sm:text-xs">Longitude</span>
           <Input
             type="number"
             step="any"
             value={lng}
             onChange={(e) => setLng(e.target.value)}
-            placeholder="-73.8867"
-            className="bg-park-bg/50"
+            placeholder="-73.886700000"
+            className="h-7 bg-park-bg/50 text-xs sm:h-9 sm:text-sm"
           />
         </label>
         <button
           type="submit"
           disabled={adding}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-park-green px-4 text-sm font-bold text-white hover:bg-park-green/90 disabled:opacity-60"
+          className="inline-flex h-7 items-center justify-center gap-2 rounded-md bg-park-green px-3 text-xs font-bold text-white hover:bg-park-green/90 disabled:opacity-60 sm:h-9 sm:px-4 sm:text-sm"
         >
-          {adding && <Loader2 className="size-4 animate-spin" />}
+          {adding && <Loader2 className="size-3.5 animate-spin sm:size-4" />}
           Add
         </button>
       </form>
 
       {/* Select all + deselect + show selected + batch actions */}
-      <div className="mb-3 flex items-center gap-2">
-        <label className="flex items-center gap-1 text-[11px] text-park-muted cursor-pointer select-none">
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 sm:mb-3">
+        <label className="flex items-center gap-1 text-[9px] text-park-muted cursor-pointer select-none sm:text-[11px]">
           <input
             type="checkbox"
             checked={allFilteredSelected}
             onChange={toggleAll}
-            className="size-3 accent-park-green"
+            className="size-2.5 accent-park-green sm:size-3"
           />
           Select all ({filtered.length})
         </label>
         <label className={cn(
-          "flex items-center gap-1 text-[11px] cursor-pointer select-none",
+          "flex items-center gap-1 text-[9px] cursor-pointer select-none sm:text-[11px]",
           selectedIds.size === 0 ? "text-park-muted/30 cursor-not-allowed" : "text-park-muted",
         )}>
           <input
@@ -727,44 +789,44 @@ function BenchManagement({
             checked={false}
             onChange={() => onSetSelected(new Set())}
             disabled={selectedIds.size === 0}
-            className="size-3 accent-park-green"
+            className="size-2.5 accent-park-green sm:size-3"
           />
           Deselect
         </label>
-        <label className="flex items-center gap-1 text-[11px] text-park-muted cursor-pointer select-none">
+        <label className="flex items-center gap-1 text-[9px] text-park-muted cursor-pointer select-none sm:text-[11px]">
           <input
             type="checkbox"
             checked={showSelectedOnly}
             onChange={(e) => setShowSelectedOnly(e.target.checked)}
-            className="size-3 accent-park-green"
+            className="size-2.5 accent-park-green sm:size-3"
           />
           Show selected ({selectedIds.size})
         </label>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:ml-auto sm:gap-2">
           <button
             onClick={() => setBatchRestrictOpen(true)}
             disabled={selectedUnrestrictedCount === 0 || !!movingBenchId}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-colors sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs",
               selectedUnrestrictedCount === 0 || movingBenchId
                 ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
                 : "bg-destructive/10 text-destructive hover:bg-destructive/20",
             )}
           >
-            <Lock className="size-3.5" />
+            <Lock className="size-3 sm:size-3.5" />
             Restrict {selectedUnrestrictedCount || 0}
           </button>
           <button
             onClick={() => setBatchUnrestrictOpen(true)}
             disabled={selectedRestrictedCount === 0 || !!movingBenchId}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-colors sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs",
               selectedRestrictedCount === 0 || movingBenchId
                 ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
                 : "bg-park-green/10 text-park-green hover:bg-park-green/20",
             )}
           >
-            <Unlock className="size-3.5" />
+            <Unlock className="size-3 sm:size-3.5" />
             Unrestrict {selectedRestrictedCount || 0}
           </button>
         </div>
@@ -776,44 +838,73 @@ function BenchManagement({
           <p className="p-4 text-sm text-park-muted">No benches found.</p>
         ) : (
           <>
-            <div className="sticky top-0 z-10 flex items-center gap-x-3 border-b border-park-border bg-park-sage/90 px-4 py-2">
+            <div className="sticky top-0 z-10 flex items-center gap-x-2 border-b border-park-border bg-park-sage/90 px-2 py-1.5 sm:gap-x-3 sm:px-4 sm:py-2">
+              <span className="hidden shrink-0 sm:block sm:w-4" />
               <div className="min-w-0 flex-1">
                 <Input
                   placeholder="Search code"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="h-7 w-28 bg-white px-2 text-xs"
+                  className="h-6 w-full bg-white px-1.5 text-[10px] sm:h-7 sm:w-28 sm:px-2 sm:text-xs"
                 />
               </div>
-              <div className="hidden shrink-0 sm:flex w-[68px] justify-end">
-                <select
-                  value={regionFilter}
-                  onChange={(e) => setRegionFilter(e.target.value as Region | "all")}
-                  className="h-7 w-full rounded-md border border-park-border bg-park-bg/50 px-1 text-xs text-park-muted"
+              <div ref={regionDropdownRef} className="relative w-[48px] shrink-0 sm:w-[68px]">
+                <button
+                  type="button"
+                  onClick={() => setRegionDropdownOpen((o) => !o)}
+                  className="flex h-6 w-full items-center justify-end gap-0.5 rounded-md border border-park-border bg-park-bg/50 px-1 text-[10px] text-park-muted hover:border-park-green sm:h-7 sm:gap-1 sm:px-2 sm:text-xs"
                 >
-                  <option value="all">All</option>
-                  {REGIONS.map((r) => (
-                    <option key={r} value={r}>
-                      {REGION_LABEL[r]}
-                    </option>
-                  ))}
-                </select>
+                  <span className="truncate">
+                    {REGIONS.every((r) => regionFilter[r])
+                      ? "All"
+                      : REGIONS.filter((r) => regionFilter[r]).map((r) => REGION_LABEL[r]).join(", ") || "None"}
+                  </span>
+                  <ChevronDown className="size-2.5 shrink-0 opacity-60 sm:size-3" />
+                </button>
+                {regionDropdownOpen && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-36 rounded-lg border border-park-border bg-white py-1 shadow-lg">
+                    <label className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-xs font-semibold text-park-ink hover:bg-park-sage/30">
+                      <input
+                        type="checkbox"
+                        checked={REGIONS.every((r) => regionFilter[r])}
+                        onChange={() => {
+                          const allOn = REGIONS.every((r) => regionFilter[r]);
+                          onSetRegionFilter({ north: !allOn, central: !allOn, south: !allOn });
+                        }}
+                        className="accent-park-green"
+                      />
+                      Select all
+                    </label>
+                    <div className="mx-2 my-0.5 border-t border-park-border" />
+                    {REGIONS.map((r) => (
+                      <label key={r} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-xs text-park-ink hover:bg-park-sage/30">
+                        <input
+                          type="checkbox"
+                          checked={regionFilter[r]}
+                          onChange={() => onToggleRegion(r)}
+                          className="accent-park-green"
+                        />
+                        {REGION_LABEL[r]}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
-              <span className="w-[72px] shrink-0" />
-              <div className="w-[110px] shrink-0 flex justify-end">
+              <span className="w-6 shrink-0 sm:w-[72px]" />
+              <div className="w-[62px] shrink-0 flex justify-end sm:w-[110px]">
                 {selectedIds.size > 0 && (
                   <button
                     onClick={() => setBatchDeleteOpen(true)}
                     disabled={!!movingBenchId}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+                      "inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-colors sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs",
                       movingBenchId
                         ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
                         : "bg-destructive text-white hover:bg-destructive/90",
                     )}
                   >
-                    <Trash2 className="size-3.5" />
-                    Delete {selectedIds.size}
+                    <Trash2 className="size-3 sm:size-3.5" />
+                    <span className="hidden sm:inline">Delete</span> {selectedIds.size}
                   </button>
                 )}
               </div>
@@ -823,7 +914,7 @@ function BenchManagement({
                 key={b.id}
                 data-bench-id={b.id}
                 className={cn(
-                  "flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-park-border px-4 py-2.5 last:border-b-0",
+                  "flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-park-border px-2 py-2 last:border-b-0 sm:gap-x-3 sm:px-4 sm:py-2.5",
                   movingBenchId === b.id
                     ? "bg-amber-100"
                     : movingBenchId
@@ -835,18 +926,18 @@ function BenchManagement({
                   type="checkbox"
                   checked={selectedIds.has(b.id)}
                   onChange={() => onToggleSelect(b.id, true)}
-                  className="size-4 shrink-0 accent-park-green"
+                  className="size-3.5 shrink-0 accent-park-green sm:size-4"
                   disabled={movingBenchId === b.id}
                 />
                 <div className="min-w-0 flex-1 flex items-center gap-1 overflow-hidden">
                   {editingCodeId === b.id ? (
                     <>
-                      <span className="text-sm text-park-muted">Bench</span>
+                      <span className="text-xs text-park-muted sm:text-sm">Bench</span>
                       <Input
                         value={editCode}
                         onChange={(e) => setEditCode(e.target.value)}
                         autoFocus
-                        className="h-6 w-16 bg-white px-1.5 text-sm font-semibold"
+                        className="h-5 w-14 bg-white px-1 text-xs font-semibold sm:h-6 sm:w-16 sm:px-1.5 sm:text-sm"
                         onKeyDown={(e) => { if (e.key === "Enter") saveCode(b.id); if (e.key === "Escape") setEditingCodeId(null); }}
                       />
                       <button
@@ -854,19 +945,19 @@ function BenchManagement({
                         disabled={editSaving}
                         className="rounded p-0.5 text-park-green hover:bg-park-green/10 disabled:opacity-50"
                       >
-                        {editSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                        {editSaving ? <Loader2 className="size-3 animate-spin sm:size-3.5" /> : <Check className="size-3 sm:size-3.5" />}
                       </button>
                       <button
                         onClick={() => setEditingCodeId(null)}
                         disabled={editSaving}
                         className="rounded p-0.5 text-destructive/60 hover:text-destructive disabled:opacity-50"
                       >
-                        <X className="size-3.5" />
+                        <X className="size-3 sm:size-3.5" />
                       </button>
                     </>
                   ) : (
                     <>
-                      <span className="font-semibold text-park-ink">
+                      <span className="text-xs font-semibold text-park-ink sm:text-sm">
                         Bench {b.code}
                       </span>
                       <button
@@ -879,24 +970,24 @@ function BenchManagement({
                             : "text-park-muted/50 hover:text-park-ink",
                         )}
                       >
-                        <Pencil className="size-3" />
+                        <Pencil className="size-2.5 sm:size-3" />
                       </button>
                     </>
                   )}
                   {b.restricted && (
-                    <span className="ml-1 rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive">
+                    <span className="ml-1 inline-block align-middle rounded bg-destructive/10 px-1 py-0.5 text-[8px] font-bold uppercase text-destructive sm:px-1.5 sm:text-[10px]">
                       Restricted
                     </span>
                   )}
                 </div>
-                <div className="hidden shrink-0 sm:flex items-center gap-1 w-[68px] justify-end">
+                <div className="flex w-[48px] shrink-0 items-center gap-1 justify-end sm:w-[68px]">
                   {editingRegionId === b.id ? (
                     <>
                       <select
                         value={editRegion}
                         onChange={(e) => setEditRegion(e.target.value as Region)}
                         autoFocus
-                        className="h-6 rounded-md border border-park-border bg-white px-1 text-xs"
+                        className="h-5 rounded-md border border-park-border bg-white px-1 text-[10px] sm:h-6 sm:text-xs"
                       >
                         {REGIONS.map((r) => (
                           <option key={r} value={r}>{REGION_LABEL[r]}</option>
@@ -907,19 +998,19 @@ function BenchManagement({
                         disabled={editSaving}
                         className="rounded p-0.5 text-park-green hover:bg-park-green/10 disabled:opacity-50"
                       >
-                        {editSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                        {editSaving ? <Loader2 className="size-3 animate-spin sm:size-3.5" /> : <Check className="size-3 sm:size-3.5" />}
                       </button>
                       <button
                         onClick={() => setEditingRegionId(null)}
                         disabled={editSaving}
                         className="rounded p-0.5 text-destructive/60 hover:text-destructive disabled:opacity-50"
                       >
-                        <X className="size-3.5" />
+                        <X className="size-3 sm:size-3.5" />
                       </button>
                     </>
                   ) : (
                     <>
-                      <span className="text-sm text-park-muted">
+                      <span className="text-[10px] text-park-muted sm:text-sm">
                         {REGION_LABEL[b.region]}
                       </span>
                       <button
@@ -932,7 +1023,7 @@ function BenchManagement({
                             : "text-park-muted/50 hover:text-park-ink",
                         )}
                       >
-                        <Pencil className="size-3" />
+                        <Pencil className="size-2.5 sm:size-3" />
                       </button>
                     </>
                   )}
@@ -940,32 +1031,34 @@ function BenchManagement({
                 {movingBenchId === b.id ? (
                   <button
                     onClick={onMoveComplete}
-                    className="inline-flex w-[72px] shrink-0 items-center gap-1 rounded-md bg-gray-500 px-2 py-1 text-xs font-bold text-white transition-colors hover:bg-gray-600"
+                    className="inline-flex w-6 shrink-0 items-center justify-center rounded-md bg-gray-500 p-1 text-[10px] font-bold text-white transition-colors hover:bg-gray-600 sm:w-[72px] sm:gap-1 sm:px-2 sm:text-xs"
                   >
-                    <XCircle className="size-3 shrink-0" />
-                    Cancel
+                    <XCircle className="size-2.5 shrink-0 sm:size-3" />
+                    <span className="hidden sm:inline">Cancel</span>
                   </button>
                 ) : (
                   <button
                     onClick={() => onStartMove(b.id)}
-                    className="inline-flex w-[72px] shrink-0 items-center gap-1 rounded-md border border-park-border px-2 py-1 text-xs font-bold text-park-muted transition-colors hover:bg-park-sage/30"
+                    className="inline-flex w-6 shrink-0 items-center justify-center rounded-md border border-park-border p-1 text-[10px] font-bold text-park-muted transition-colors hover:bg-park-sage/30 sm:w-[72px] sm:gap-1 sm:px-2 sm:text-xs"
                   >
-                    <Move className="size-3 shrink-0" />
-                    Move
+                    <Move className="size-2.5 shrink-0 sm:size-3" />
+                    <span className="hidden sm:inline">Move</span>
                   </button>
                 )}
-                {movingBenchId === b.id ? (
-                  <button
-                    onClick={saveMove}
-                    disabled={moveSaving}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-park-green px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-park-green/90 disabled:opacity-60"
-                  >
-                    {moveSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-                    {moveSaving ? "Saving…" : "Save"}
-                  </button>
-                ) : (
-                  <DeleteButton onClick={() => setDeleteTarget(b)} />
-                )}
+                <div className="w-[62px] shrink-0 flex justify-end sm:w-[110px]">
+                  {movingBenchId === b.id ? (
+                    <button
+                      onClick={saveMove}
+                      disabled={moveSaving}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-park-green px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-park-green/90 disabled:opacity-60"
+                    >
+                      {moveSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                      {moveSaving ? "Saving…" : "Save"}
+                    </button>
+                  ) : (
+                    <DeleteButton onClick={() => setDeleteTarget(b)} />
+                  )}
+                </div>
                 {movingBenchId === b.id && (
                   <div className="flex w-full items-center justify-center gap-2">
                     <label className="flex items-center gap-1 text-xs font-semibold text-park-ink">
@@ -1068,7 +1161,11 @@ function ReservationManagement({
     if (status !== "all" && r.status !== status) return false;
     if (benchQ && !r.bench_code.toLowerCase().includes(benchQ.toLowerCase()))
       return false;
-    if (userQ && !r.username.toLowerCase().includes(userQ.toLowerCase()))
+    if (
+      userQ &&
+      !r.username.toLowerCase().includes(userQ.toLowerCase()) &&
+      !`${r.firstName} ${r.lastName}`.toLowerCase().includes(userQ.toLowerCase())
+    )
       return false;
     return true;
   });
@@ -1187,13 +1284,13 @@ function ReservationManagement({
           placeholder="Bench code"
           value={benchQ}
           onChange={(e) => setBenchQ(e.target.value)}
-          className="h-9 w-32 bg-park-bg/50"
+          className="h-9 w-full bg-park-bg/50 sm:w-32"
         />
         <Input
-          placeholder="Username"
+          placeholder="Name or username"
           value={userQ}
           onChange={(e) => setUserQ(e.target.value)}
-          className="h-9 w-40 bg-park-bg/50"
+          className="h-9 w-full bg-park-bg/50 sm:w-40"
         />
       </div>
       <div className="min-h-[320px] max-h-[320px] overflow-auto rounded-xl border border-park-border">
@@ -1235,20 +1332,20 @@ function ReservationManagement({
             {filtered.map((r) => (
               <div
                 key={r.id}
-                className="flex items-center gap-3 border-b border-park-border px-4 py-3 last:border-b-0"
+                className="flex items-center gap-2 border-b border-park-border px-3 py-2.5 last:border-b-0 sm:gap-3 sm:px-4 sm:py-3"
               >
                 <input
                   type="checkbox"
                   checked={selected.has(r.id)}
                   onChange={() => toggleOne(r.id)}
-                  className="size-4 shrink-0 accent-park-green"
+                  className="size-3.5 shrink-0 accent-park-green sm:size-4"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-park-ink">
+                  <p className="whitespace-nowrap text-sm font-semibold text-park-ink sm:text-base">
                     Bench {r.bench_code}
                     <span
                       className={cn(
-                        "ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase",
+                        "ml-1.5 inline-block align-middle rounded px-1 py-0.5 text-[9px] font-bold uppercase sm:ml-2 sm:px-1.5 sm:text-[10px]",
                         r.status === "cancelled"
                           ? "bg-destructive/10 text-destructive"
                           : "bg-park-sage text-park-green",
@@ -1257,12 +1354,14 @@ function ReservationManagement({
                       {r.status}
                     </span>
                   </p>
-                  <p className="truncate text-sm text-park-muted">
-                    {r.username} ·{" "}
-                    {formatRangeCompact(r.start_month, r.end_month)}
+                  <p className="truncate text-xs text-park-muted sm:text-sm">
+                    {r.firstName && r.lastName
+                      ? `${r.firstName} ${r.lastName} (${r.username})`
+                      : r.username}{" "}
+                    · {formatRangeCompact(r.start_month, r.end_month)}
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5">
                   {r.status === "active" && (
                     <CancelButton onClick={() => setCancelTarget(r)} />
                   )}
@@ -1347,11 +1446,14 @@ function CreateReservationPanel({
 
   const userMatches = userQ
     ? users
-        .filter(
-          (u) =>
-            u.username.toLowerCase().includes(userQ.toLowerCase()) ||
-            u.email.toLowerCase().includes(userQ.toLowerCase()),
-        )
+        .filter((u) => {
+          const q = userQ.toLowerCase();
+          return (
+            u.username.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q) ||
+            `${u.first_name} ${u.last_name}`.toLowerCase().includes(q)
+          );
+        })
         .slice(0, 5)
     : [];
   const benchMatches = benchQ
@@ -1397,7 +1499,7 @@ function CreateReservationPanel({
   const selectedBench = benches.find((b) => b.id === benchId);
 
   return (
-    <section className="h-fit rounded-2xl border border-park-border bg-park-surface p-5">
+    <section className="h-fit overflow-hidden rounded-2xl border border-park-border bg-park-surface p-5">
       <h2 className="text-lg font-bold text-park-green">
         Create a reservation
       </h2>
@@ -1409,7 +1511,9 @@ function CreateReservationPanel({
           label="User"
           value={
             selectedUser
-              ? `${selectedUser.username} — ${selectedUser.email}`
+              ? selectedUser.first_name && selectedUser.last_name
+                ? `${selectedUser.first_name} ${selectedUser.last_name} (${selectedUser.username})`
+                : `${selectedUser.username} — ${selectedUser.email}`
               : userQ
           }
           onChange={(v) => {
@@ -1418,13 +1522,16 @@ function CreateReservationPanel({
           }}
           matches={userMatches.map((u) => ({
             id: u.id,
-            label: `${u.username} — ${u.email}`,
+            label:
+              u.first_name && u.last_name
+                ? `${u.first_name} ${u.last_name} (${u.username})`
+                : `${u.username} — ${u.email}`,
           }))}
           onPick={(id, label) => {
             setUserId(id);
             setUserQ(label);
           }}
-          placeholder="Search by username"
+          placeholder="Search by name or username"
         />
         <Picker
           label="Bench"

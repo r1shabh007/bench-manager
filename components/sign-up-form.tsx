@@ -12,6 +12,8 @@ export function SignUpForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -48,7 +50,7 @@ export function SignUpForm({
     }
 
     try {
-      const result = await signUpWithUsername(email, username, password);
+      const result = await signUpWithUsername(email, username, password, firstName, lastName);
       if (!result.ok) {
         setError(result.error ?? "An error occurred");
         return;
@@ -76,6 +78,28 @@ export function SignUpForm({
         </div>
         <form onSubmit={handleSignUp}>
           <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-semibold text-park-ink">First name</span>
+                <Input
+                  type="text"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="h-11 rounded-lg bg-park-bg"
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-semibold text-park-ink">Last name</span>
+                <Input
+                  type="text"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="h-11 rounded-lg bg-park-bg"
+                />
+              </label>
+            </div>
             <label className="flex flex-col gap-1.5">
               <span className="text-sm font-semibold text-park-ink">Email</span>
               <Input

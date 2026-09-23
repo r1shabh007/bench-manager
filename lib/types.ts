@@ -23,6 +23,8 @@ export interface Bench {
 export interface SessionUser {
   id: string;
   username: string;
+  firstName: string;
+  lastName: string;
   email: string;
   isAdmin: boolean;
 }
@@ -42,12 +44,16 @@ export interface ReservationRow {
 
 export interface AdminReservationRow extends ReservationRow {
   username: string;
+  firstName: string;
+  lastName: string;
   email: string;
 }
 
 export interface AdminUserRow {
   id: string;
   username: string;
+  first_name: string;
+  last_name: string;
   email: string;
   is_admin: boolean;
   created_at: string;

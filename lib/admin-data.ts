@@ -18,7 +18,7 @@ export async function getAllUsers(): Promise<AdminUserRow[]> {
   const [{ data: profiles }, { data: reservations }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, username, email, is_admin, created_at")
+      .select("id, username, first_name, last_name, email, is_admin, created_at")
       .order("created_at", { ascending: false }),
     supabase.from("reservations").select("user_id"),
   ]);
@@ -32,6 +32,8 @@ export async function getAllUsers(): Promise<AdminUserRow[]> {
   return (profiles ?? []).map((p) => ({
     id: p.id as string,
     username: p.username as string,
+    first_name: (p.first_name as string) ?? "",
+    last_name: (p.last_name as string) ?? "",
     email: p.email as string,
     is_admin: p.is_admin as boolean,
     created_at: p.created_at as string,
@@ -44,17 +46,19 @@ export async function getAllReservations(): Promise<AdminReservationRow[]> {
   const { data } = await supabase
     .from("reservations")
     .select(
-      "id, bench_id, user_id, start_month, end_month, status, created_at, cancelled_at, benches(code, region, description), profiles!user_id(username, email)",
+      "id, bench_id, user_id, start_month, end_month, status, created_at, cancelled_at, benches(code, region, description), profiles!user_id(username, first_name, last_name, email)",
     )
     .order("created_at", { ascending: false });
 
   return (data ?? []).map((r) => {
     const base = mapReservationRow(r);
-    const profile = (r as { profiles?: { username?: string; email?: string } })
+    const profile = (r as { profiles?: { username?: string; first_name?: string; last_name?: string; email?: string } })
       .profiles;
     return {
       ...base,
       username: profile?.username ?? "?",
+      firstName: profile?.first_name ?? "",
+      lastName: profile?.last_name ?? "",
       email: profile?.email ?? "",
     } satisfies AdminReservationRow;
   });
@@ -72,34 +76,16 @@ export async function getAdminBenches(): Promise<Bench[]> {
     data = fallback.data as any;
   }
   return ((data ?? []) as (Omit<Bench, "longitude" | "latitude"> & { x_pct: number; y_pct: number })[])
-    .map((b) => {
-      const xVal = Number(b.x_pct);
-      const yVal = Number(b.y_pct);
-      const isLegacy = xVal >= 0 && xVal <= 100 && yVal >= 0 && yVal <= 100;
-      return {
-        id: b.id,
-        code: b.code,
-        region: b.region,
-        longitude: isLegacy ? pctToLng(xVal) : xVal,
-        latitude: isLegacy ? pctToLat(yVal) : yVal,
-        description: b.description,
-        restricted: Boolean((b as any).restricted),
-      };
-    })
+    .map((b) => ({
+      id: b.id,
+      code: b.code,
+      region: b.region,
+      longitude: Number(b.x_pct),
+      latitude: Number(b.y_pct),
+      description: b.description,
+      restricted: Boolean((b as any).restricted),
+    }))
     .sort(sortByCode);
-}
-
-const PARK_LNG_MIN = -73.9020;
-const PARK_LNG_MAX = -73.8720;
-const PARK_LAT_MIN = 40.8830;
-const PARK_LAT_MAX = 40.9120;
-
-function pctToLng(pct: number): number {
-  return PARK_LNG_MIN + (pct / 100) * (PARK_LNG_MAX - PARK_LNG_MIN);
-}
-
-function pctToLat(pct: number): number {
-  return PARK_LAT_MAX - (pct / 100) * (PARK_LAT_MAX - PARK_LAT_MIN);
 }
 
 export type { Region };

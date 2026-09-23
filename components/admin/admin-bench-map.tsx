@@ -98,11 +98,11 @@ export function AdminBenchMap({
           center: PARK_CENTER,
           zoom: 14,
           minZoom: 13,
-          maxZoom: 19,
+          maxZoom: 22,
           maxBounds: L.latLngBounds(BOUNDS_SW, BOUNDS_NE),
           maxBoundsViscosity: 1.0,
         });
-        L.tileLayer(TILE_URL, { attribution: ATTRIBUTION, maxZoom: 19 }).addTo(map);
+        L.tileLayer(TILE_URL, { attribution: ATTRIBUTION, maxZoom: 22 }).addTo(map);
         mapRef.current = map;
         LRef.current = L;
         setReady(true);
@@ -176,25 +176,37 @@ export function AdminBenchMap({
     }
   });
 
-  // Handle move mode: make the marker draggable
+  // Handle move mode: make the marker draggable, raise it above others
   React.useEffect(() => {
     if (!ready) return;
     const markers = markersRef.current;
 
     if (mode.type === "move") {
-      const marker = markers.get(mode.benchId);
-      if (marker && !marker.dragging.enabled()) {
-        marker.dragging.enable();
-        marker.on("drag", () => {
-          const pos = marker.getLatLng();
+      const movingMarker = markers.get(mode.benchId);
+
+      for (const [id, marker] of markers) {
+        const el = marker.getElement() as HTMLElement | null;
+        if (!el) continue;
+        if (id === mode.benchId) {
+          el.style.zIndex = "10000";
+          el.style.opacity = "1";
+        } else {
+          el.style.opacity = "0.3";
+        }
+      }
+
+      if (movingMarker && !movingMarker.dragging.enabled()) {
+        movingMarker.dragging.enable();
+        movingMarker.on("drag", () => {
+          const pos = movingMarker.getLatLng();
           setMode((prev) =>
             prev.type === "move"
               ? {
                   ...prev,
                   lat: pos.lat,
                   lng: pos.lng,
-                  latInput: pos.lat.toFixed(6),
-                  lngInput: pos.lng.toFixed(6),
+                  latInput: pos.lat.toFixed(9),
+                  lngInput: pos.lng.toFixed(9),
                 }
               : prev,
           );
@@ -205,6 +217,11 @@ export function AdminBenchMap({
         if (marker.dragging?.enabled()) {
           marker.dragging.disable();
           marker.off("drag");
+        }
+        const el = marker.getElement() as HTMLElement | null;
+        if (el) {
+          el.style.zIndex = "";
+          el.style.opacity = "1";
         }
       }
     }
@@ -222,8 +239,8 @@ export function AdminBenchMap({
       benchId: bench.id,
       lat: bench.latitude,
       lng: bench.longitude,
-      latInput: bench.latitude.toFixed(6),
-      lngInput: bench.longitude.toFixed(6),
+      latInput: bench.latitude.toFixed(9),
+      lngInput: bench.longitude.toFixed(9),
       origLat: bench.latitude,
       origLng: bench.longitude,
     });
@@ -316,47 +333,47 @@ export function AdminBenchMap({
 
         {/* Move mode — overlays bottom of map */}
         {mode.type === "move" && (
-          <div className="absolute bottom-3 left-3 right-3 z-[1000] rounded-xl border border-amber-300/80 bg-amber-50/85 p-3 backdrop-blur-sm">
-            <p className="mb-2 text-sm font-bold text-park-ink">
+          <div className="absolute bottom-2 left-2 right-2 z-[1000] rounded-xl border border-amber-300/80 bg-amber-50/85 p-2 backdrop-blur-sm sm:bottom-3 sm:left-3 sm:right-3 sm:p-3">
+            <p className="mb-1.5 text-xs font-bold text-park-ink sm:mb-2 sm:text-sm">
               Move — Bench{" "}
               {benches.find((b) => b.id === mode.benchId)?.code}
             </p>
-            <p className="mb-2 text-xs text-park-muted">
+            <p className="mb-1.5 text-[10px] text-park-muted sm:mb-2 sm:text-xs">
               Drag the dot on the map or type coordinates below.
             </p>
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-park-ink">
+            <div className="flex flex-wrap items-end gap-2 sm:gap-3">
+              <label className="flex flex-col gap-0.5 sm:gap-1">
+                <span className="text-[10px] font-semibold text-park-ink sm:text-xs">
                   Latitude
                 </span>
                 <input
                   type="text"
                   value={mode.latInput}
                   onChange={(e) => handleLatInput(e.target.value)}
-                  className="h-8 w-32 rounded-md border border-park-border bg-white px-2 font-mono text-sm"
+                  className="h-7 w-32 rounded-md border border-park-border bg-white px-1.5 font-mono text-[10px] sm:h-8 sm:w-40 sm:px-2 sm:text-xs"
                 />
               </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-park-ink">
+              <label className="flex flex-col gap-0.5 sm:gap-1">
+                <span className="text-[10px] font-semibold text-park-ink sm:text-xs">
                   Longitude
                 </span>
                 <input
                   type="text"
                   value={mode.lngInput}
                   onChange={(e) => handleLngInput(e.target.value)}
-                  className="h-8 w-32 rounded-md border border-park-border bg-white px-2 font-mono text-sm"
+                  className="h-7 w-32 rounded-md border border-park-border bg-white px-1.5 font-mono text-[10px] sm:h-8 sm:w-40 sm:px-2 sm:text-xs"
                 />
               </label>
               <button
                 onClick={confirmMove}
                 disabled={saving}
-                className="h-8 rounded-md bg-park-green px-4 text-xs font-bold text-white hover:bg-park-green/90 disabled:opacity-60"
+                className="h-7 rounded-md bg-park-green px-3 text-[10px] font-bold text-white hover:bg-park-green/90 disabled:opacity-60 sm:h-8 sm:px-4 sm:text-xs"
               >
                 {saving ? "Saving…" : "Confirm"}
               </button>
               <button
                 onClick={cancelMove}
-                className="h-8 rounded-md border border-park-border px-4 text-xs font-bold text-park-muted hover:bg-park-sage/30"
+                className="h-7 rounded-md border border-park-border px-3 text-[10px] font-bold text-park-muted hover:bg-park-sage/30 sm:h-8 sm:px-4 sm:text-xs"
               >
                 Cancel
               </button>
@@ -436,97 +453,97 @@ function SelectionPanel({
   }
 
   return (
-    <div className="rounded-xl border border-park-border/80 bg-park-surface/85 p-3 backdrop-blur-sm">
+    <div className="rounded-xl border border-park-border/80 bg-park-surface/85 p-2 backdrop-blur-sm sm:p-3">
       {/* Header */}
       {singleBench ? (
-        <div className="mb-2">
-          <div className="flex items-center gap-1.5">
+        <div className="mb-1.5 sm:mb-2">
+          <div className="flex items-center gap-1 sm:gap-1.5">
             {editingCode ? (
               <>
-                <span className="text-sm text-park-muted">Bench</span>
+                <span className="text-xs text-park-muted sm:text-sm">Bench</span>
                 <input
                   value={editCode}
                   onChange={(e) => setEditCode(e.target.value)}
                   autoFocus
-                  className="h-6 w-16 rounded-md border border-park-border bg-white px-1.5 text-sm font-semibold"
+                  className="h-5 w-14 rounded-md border border-park-border bg-white px-1 text-xs font-semibold sm:h-6 sm:w-16 sm:px-1.5 sm:text-sm"
                   onKeyDown={(e) => { if (e.key === "Enter") saveCode(); if (e.key === "Escape") setEditingCode(false); }}
                 />
                 <button onClick={saveCode} disabled={editSaving} className="rounded p-0.5 text-park-green hover:bg-park-green/10 disabled:opacity-50">
-                  {editSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                  {editSaving ? <Loader2 className="size-3 animate-spin sm:size-3.5" /> : <Check className="size-3 sm:size-3.5" />}
                 </button>
                 <button onClick={() => setEditingCode(false)} disabled={editSaving} className="rounded p-0.5 text-destructive/60 hover:text-destructive disabled:opacity-50">
-                  <X className="size-3.5" />
+                  <X className="size-3 sm:size-3.5" />
                 </button>
               </>
             ) : (
               <>
-                <p className="text-sm font-bold text-park-ink">
+                <p className="text-xs font-bold text-park-ink sm:text-sm">
                   Bench {singleBench.code}
                 </p>
                 <button
                   onClick={() => { setEditCode(singleBench.code); setEditingCode(true); setEditingRegion(false); }}
                   className="rounded p-0.5 text-park-muted/50 hover:text-park-ink"
                 >
-                  <Pencil className="size-3" />
+                  <Pencil className="size-2.5 sm:size-3" />
                 </button>
               </>
             )}
-            <span className="mx-1 text-park-muted">·</span>
+            <span className="mx-0.5 text-park-muted sm:mx-1">·</span>
             {editingRegion ? (
               <>
                 <select
                   value={editRegion}
                   onChange={(e) => setEditRegion(e.target.value as Region)}
                   autoFocus
-                  className="h-6 rounded-md border border-park-border bg-white px-1 text-xs"
+                  className="h-5 rounded-md border border-park-border bg-white px-1 text-[10px] sm:h-6 sm:text-xs"
                 >
                   {REGIONS.map((r) => (
                     <option key={r} value={r}>{REGION_LABEL[r]}</option>
                   ))}
                 </select>
                 <button onClick={saveRegion} disabled={editSaving} className="rounded p-0.5 text-park-green hover:bg-park-green/10 disabled:opacity-50">
-                  {editSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                  {editSaving ? <Loader2 className="size-3 animate-spin sm:size-3.5" /> : <Check className="size-3 sm:size-3.5" />}
                 </button>
                 <button onClick={() => setEditingRegion(false)} disabled={editSaving} className="rounded p-0.5 text-destructive/60 hover:text-destructive disabled:opacity-50">
-                  <X className="size-3.5" />
+                  <X className="size-3 sm:size-3.5" />
                 </button>
               </>
             ) : (
               <>
-                <span className="text-xs text-park-muted">{REGION_LABEL[singleBench.region]}</span>
+                <span className="text-[10px] text-park-muted sm:text-xs">{REGION_LABEL[singleBench.region]}</span>
                 <button
                   onClick={() => { setEditRegion(singleBench.region); setEditingRegion(true); setEditingCode(false); }}
                   className="rounded p-0.5 text-park-muted/50 hover:text-park-ink"
                 >
-                  <Pencil className="size-3" />
+                  <Pencil className="size-2.5 sm:size-3" />
                 </button>
               </>
             )}
           </div>
           <div className="flex items-center">
-            <p className="font-mono text-xs text-park-muted">
-              {singleBench.latitude.toFixed(6)},{" "}
-              {singleBench.longitude.toFixed(6)}
+            <p className="font-mono text-[10px] text-park-muted sm:text-xs">
+              {singleBench.latitude.toFixed(9)},{" "}
+              {singleBench.longitude.toFixed(9)}
             </p>
             <button
               onClick={onDeselect}
-              className="ml-auto text-[10px] font-semibold text-park-muted hover:text-park-ink"
+              className="ml-auto text-[9px] font-semibold text-park-muted hover:text-park-ink sm:text-[10px]"
             >
               Deselect all
             </button>
           </div>
         </div>
       ) : (
-        <div className="mb-2 flex items-baseline">
-          <p className="text-sm font-bold text-park-ink">
+        <div className="mb-1.5 flex items-baseline sm:mb-2">
+          <p className="text-xs font-bold text-park-ink sm:text-sm">
             {selected.length} benches selected
           </p>
-          <span className="ml-2 text-[10px] text-park-muted">
+          <span className="ml-1.5 text-[9px] text-park-muted sm:ml-2 sm:text-[10px]">
             — select 1 to move or edit
           </span>
           <button
             onClick={onDeselect}
-            className="ml-auto text-[10px] font-semibold text-park-muted hover:text-park-ink"
+            className="ml-auto text-[9px] font-semibold text-park-muted hover:text-park-ink sm:text-[10px]"
           >
             Deselect all
           </button>
@@ -534,13 +551,13 @@ function SelectionPanel({
       )}
 
       {/* Actions row */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         {/* Move button */}
         <button
           onClick={multiSelect ? undefined : onStartMove}
           disabled={multiSelect}
           className={cn(
-            "inline-flex shrink-0 items-center justify-center rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+            "inline-flex shrink-0 items-center justify-center rounded-md px-2 py-1 text-[10px] font-bold transition-colors sm:px-3 sm:py-1.5 sm:text-xs",
             multiSelect
               ? "bg-park-green/5 text-park-muted cursor-not-allowed"
               : "bg-park-green/10 text-park-green hover:bg-park-green/20",
@@ -549,38 +566,38 @@ function SelectionPanel({
           Move
         </button>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => onBatchRestrict(restrictableIds)}
             disabled={restrictableIds.length === 0}
             className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+              "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-colors sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs",
               restrictableIds.length === 0
                 ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
                 : "bg-destructive/10 text-destructive hover:bg-destructive/20",
             )}
           >
-            <Lock className="size-3.5" />
+            <Lock className="size-3 sm:size-3.5" />
             Restrict{multiSelect ? ` ${restrictableIds.length}` : ""}
           </button>
           <button
             onClick={() => onBatchUnrestrict(unrestrictableIds)}
             disabled={unrestrictableIds.length === 0}
             className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-colors",
+              "inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition-colors sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs",
               unrestrictableIds.length === 0
                 ? "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
                 : "bg-park-green/10 text-park-green hover:bg-park-green/20",
             )}
           >
-            <Unlock className="size-3.5" />
+            <Unlock className="size-3 sm:size-3.5" />
             Unrestrict{multiSelect ? ` ${unrestrictableIds.length}` : ""}
           </button>
           <button
             onClick={() => onBatchDelete(Array.from(selectedIds))}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-destructive/90"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md bg-destructive px-2 py-1 text-[10px] font-bold text-white transition-colors hover:bg-destructive/90 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs"
           >
-            <Trash2 className="size-3.5" />
+            <Trash2 className="size-3 sm:size-3.5" />
             Delete{multiSelect ? ` ${selected.length}` : ""}
           </button>
         </div>

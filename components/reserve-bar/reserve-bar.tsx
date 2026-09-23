@@ -94,7 +94,7 @@ export function ReserveBar({
   const rangeLabel = monthRangeLabel(sortedSelected);
 
   return (
-    <div className="flex flex-col items-start gap-1.5 sm:items-end">
+    <div className="flex flex-col items-center gap-1.5 sm:items-start">
       <button
         type="button"
         disabled={!enabled}
@@ -108,7 +108,7 @@ export function ReserveBar({
       >
         {bench ? `Reserve bench ${bench.code}` : "Reserve a bench"}
       </button>
-      <p className="max-w-sm text-right text-xs text-park-muted">{HELPER_TEXT}</p>
+      {!enabled && <p className="text-center text-xs text-park-muted sm:text-left">{HELPER_TEXT}</p>}
 
       <Dialog
         open={confirmOpen}

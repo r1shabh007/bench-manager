@@ -8,7 +8,7 @@ export type AuthTab = "login" | "signup";
 
 interface OpenOptions {
   tab?: AuthTab;
-  onSuccess?: () => void;
+  onSuccess?: (info: { isAdmin: boolean }) => void;
 }
 
 interface AuthModalContextValue {
@@ -31,7 +31,7 @@ export function AuthModalProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
   const [tab, setTab] = React.useState<AuthTab>("login");
-  const onSuccessRef = React.useRef<(() => void) | undefined>(undefined);
+  const onSuccessRef = React.useRef<((info: { isAdmin: boolean }) => void) | undefined>(undefined);
 
   const open = React.useCallback((options?: OpenOptions) => {
     setTab(options?.tab ?? "login");
@@ -44,15 +44,13 @@ export function AuthModalProvider({ children }: { children: React.ReactNode }) {
     onSuccessRef.current = undefined;
   }, []);
 
-  const handleSuccess = React.useCallback(() => {
+  const handleSuccess = React.useCallback((info: { isAdmin: boolean }) => {
     setIsOpen(false);
-    // Refresh server components so nav/account reflect the new session.
     router.refresh();
     const cb = onSuccessRef.current;
     onSuccessRef.current = undefined;
     if (cb) {
-      // Let the modal close before continuing the flow.
-      setTimeout(cb, 50);
+      setTimeout(() => cb(info), 50);
     }
   }, [router]);
 

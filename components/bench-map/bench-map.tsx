@@ -25,6 +25,12 @@ const DOT_COLORS: Record<DotState, string> = {
   selected: "#FFD60A",
 };
 
+const DOT_Z: Record<DotState, number> = {
+  unavailable: 0,
+  available: 1000,
+  selected: 2000,
+};
+
 const BOUNDS_SW: [number, number] = [40.8700, -73.9150];
 const BOUNDS_NE: [number, number] = [40.9250, -73.8580];
 
@@ -55,14 +61,14 @@ export function BenchMap({ readOnly = false }: { readOnly?: boolean }) {
           center: PARK_CENTER,
           zoom: 14,
           minZoom: 13,
-          maxZoom: 19,
+          maxZoom: 22,
           maxBounds: L.latLngBounds(BOUNDS_SW, BOUNDS_NE),
           maxBoundsViscosity: 1.0,
         });
 
         L.tileLayer(TILE_URL, {
           attribution: ATTRIBUTION,
-          maxZoom: 19,
+          maxZoom: 22,
         }).addTo(map);
 
         mapRef.current = map;
@@ -168,7 +174,10 @@ function createBenchMarker(
     iconAnchor: [7, 7],
   });
 
-  const marker = L.marker([bench.latitude, bench.longitude], { icon });
+  const marker = L.marker([bench.latitude, bench.longitude], {
+    icon,
+    zIndexOffset: DOT_Z[state],
+  });
 
   if (!readOnly) {
     marker.on("click", onClick);
@@ -184,6 +193,7 @@ function createBenchMarker(
 }
 
 function updateMarkerColor(marker: any, state: DotState, bench: Bench) {
+  marker.setZIndexOffset(DOT_Z[state]);
   const el = marker.getElement()?.querySelector(".bench-dot") as HTMLElement | null;
   if (!el) return;
   el.style.background = DOT_COLORS[state];

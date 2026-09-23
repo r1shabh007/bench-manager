@@ -14,7 +14,10 @@ export function usernameFromUser(user: User): string {
  * Make sure a `profiles` row exists for this auth user, using the username
  * stored in user_metadata. No-ops if the table hasn't been migrated yet.
  */
-export async function ensureProfile(user: User): Promise<void> {
+export async function ensureProfile(
+  user: User,
+  extra?: { firstName?: string; lastName?: string },
+): Promise<void> {
   const supabase = await createClient();
   const username = usernameFromUser(user);
   const email = user.email ?? "";
@@ -38,6 +41,8 @@ export async function ensureProfile(user: User): Promise<void> {
     id: user.id,
     username,
     email,
+    first_name: extra?.firstName ?? "",
+    last_name: extra?.lastName ?? "",
     is_admin: false,
   });
   if (error) {
@@ -60,13 +65,15 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("username, email, is_admin")
+    .select("username, first_name, last_name, email, is_admin")
     .eq("id", user.id)
     .maybeSingle();
 
   return {
     id: user.id,
     username: profile?.username || usernameFromUser(user),
+    firstName: (profile?.first_name as string) ?? "",
+    lastName: (profile?.last_name as string) ?? "",
     email: profile?.email || user.email || "",
     isAdmin: profile?.is_admin ?? false,
   };

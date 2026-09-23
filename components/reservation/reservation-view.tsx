@@ -44,12 +44,9 @@ export function ReservationView({
       <div className="mt-6 flex flex-wrap items-end gap-3">
         <ViewToggle />
         <RegionFilter />
-        <div className="ml-auto">
-          <ReserveBar isLoggedIn={isLoggedIn} hasActiveReservation={hasActiveReservation} />
-        </div>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr]">
         <div className="flex flex-col gap-3">
           {view === "map" ? <BenchMap /> : <BenchList />}
           <MapLegend />
@@ -63,8 +60,9 @@ export function ReservationView({
         <div className="flex flex-col gap-4">
           <SelectedSummary />
           <MonthCalendar />
+          <ReserveBar isLoggedIn={isLoggedIn} hasActiveReservation={hasActiveReservation} />
           {!isLoggedIn && (
-            <p className="text-xs text-park-rust">
+            <p className="text-center text-xs text-park-rust sm:text-left">
               You&apos;ll be asked to log in before completing this reservation.
             </p>
           )}

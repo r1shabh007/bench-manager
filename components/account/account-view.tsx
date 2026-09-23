@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { REGION_LABEL, type ReservationRow, type SessionUser } from "@/lib/types";
+import { User } from "lucide-react";
 import {
   diffMonths,
   formatRangeCompact,
@@ -32,6 +33,7 @@ export function AccountView({
   reservations: ReservationRow[];
   currentMonth: Month;
 }) {
+  const [showDetails, setShowDetails] = React.useState(false);
   const now = monthIndex(currentMonth);
   const active = reservations.filter(
     (r) => r.status === "active" && monthIndex(r.end_month) >= now,
@@ -42,12 +44,42 @@ export function AccountView({
 
   return (
     <div className="mx-auto max-w-4xl px-5 py-8 sm:px-10">
-      <p className="text-xs font-bold uppercase tracking-wide text-park-rust">
-        Signed in as {user.username}
-      </p>
-      <h1 className="mb-6 font-serif text-4xl text-park-green">
-        Your bench adoptions
-      </h1>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-park-rust">
+            {user.firstName
+              ? `Welcome, ${user.firstName}`
+              : `Signed in as ${user.username}`}
+          </p>
+          <h1 className="font-serif text-4xl text-park-green">
+            Your bench adoptions
+          </h1>
+        </div>
+        <button
+          onClick={() => setShowDetails((o) => !o)}
+          className="inline-flex items-center gap-1.5 rounded-full border border-park-border px-4 py-2 text-sm font-semibold text-park-green transition-colors hover:bg-park-sage/50"
+        >
+          <User className="size-4" />
+          Account details
+        </button>
+      </div>
+
+      {showDetails && (
+        <div className="mb-6 rounded-2xl border border-park-border bg-park-surface p-5">
+          <h2 className="mb-3 text-sm font-bold text-park-green">
+            Account details
+          </h2>
+          <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+            {(user.firstName || user.lastName) && (
+              <DetailField label="Name">
+                {user.firstName} {user.lastName}
+              </DetailField>
+            )}
+            <DetailField label="Username">{user.username}</DetailField>
+            <DetailField label="Email">{user.email}</DetailField>
+          </div>
+        </div>
+      )}
 
       <Section title="Active reservation">
         {active.length === 0 ? (
@@ -204,6 +236,17 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
         {label}
       </span>
       <span className="font-semibold text-park-ink">{children}</span>
+    </div>
+  );
+}
+
+function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-park-muted">
+        {label}
+      </span>
+      <span className="font-medium text-park-ink">{children}</span>
     </div>
   );
 }

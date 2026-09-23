@@ -8,6 +8,7 @@ export interface AuthResult {
   ok: boolean;
   error?: string;
   needsConfirmation?: boolean;
+  isAdmin?: boolean;
 }
 
 export interface UsernameCheck {
@@ -92,7 +93,17 @@ export async function loginWithUsername(
   } = await supabase.auth.getUser();
   if (user) await ensureProfile(user);
 
-  return { ok: true };
+  let isAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_admin")
+      .eq("id", user.id)
+      .maybeSingle();
+    isAdmin = profile?.is_admin ?? false;
+  }
+
+  return { ok: true, isAdmin };
 }
 
 /** Live username availability check (case-insensitive). */
@@ -133,10 +144,17 @@ export async function signUpWithUsername(
   email: string,
   username: string,
   password: string,
+  firstName: string,
+  lastName: string,
 ): Promise<AuthResult> {
   const mail = email.trim();
   const uname = normalizeUsername(username);
+  const fName = firstName.trim();
+  const lName = lastName.trim();
 
+  if (!fName || !lName) {
+    return { ok: false, error: "First and last name are required." };
+  }
   if (!EMAIL_RE.test(mail)) {
     return { ok: false, error: "Enter a valid email address." };
   }
@@ -168,7 +186,7 @@ export async function signUpWithUsername(
   }
 
   if (data.user) {
-    await ensureProfile(data.user);
+    await ensureProfile(data.user, { firstName: fName, lastName: lName });
   }
 
   const needsConfirmation = !data.session;

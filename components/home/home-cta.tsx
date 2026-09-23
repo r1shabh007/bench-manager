@@ -23,7 +23,7 @@ export function HomeCta({ loggedIn }: { loggedIn: boolean }) {
     <div className="flex gap-3 pt-2">
       <Link
         href="/reservation"
-        className="inline-flex h-12 items-center justify-center rounded-full bg-park-sage px-7 text-sm font-bold text-park-green shadow-md transition-all hover:bg-white hover:shadow-lg"
+        className="inline-flex h-12 items-center justify-center rounded-full bg-park-sage px-7 text-center text-sm font-bold text-park-green shadow-md transition-all hover:bg-white hover:shadow-lg"
       >
         Find a bench
       </Link>

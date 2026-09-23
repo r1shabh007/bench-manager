@@ -23,20 +23,15 @@ export async function getBenches(): Promise<Bench[]> {
     console.warn("[getBenches] using placeholder benches:", error.message);
     return generatePlaceholderBenches();
   }
-  const benches = ((data ?? []) as (Omit<Bench, "longitude" | "latitude"> & { x_pct: number; y_pct: number })[]).map((b) => {
-    const xVal = Number(b.x_pct);
-    const yVal = Number(b.y_pct);
-    const isLegacy = xVal >= 0 && xVal <= 100 && yVal >= 0 && yVal <= 100;
-    return {
-      id: b.id,
-      code: b.code,
-      region: b.region,
-      longitude: isLegacy ? pctToLng(xVal) : xVal,
-      latitude: isLegacy ? pctToLat(yVal) : yVal,
-      description: b.description,
-      restricted: Boolean((b as any).restricted),
-    };
-  });
+  const benches = ((data ?? []) as (Omit<Bench, "longitude" | "latitude"> & { x_pct: number; y_pct: number })[]).map((b) => ({
+    id: b.id,
+    code: b.code,
+    region: b.region,
+    longitude: Number(b.x_pct),
+    latitude: Number(b.y_pct),
+    description: b.description,
+    restricted: Boolean((b as any).restricted),
+  }));
   if (benches.length === 0) return generatePlaceholderBenches();
   return benches.sort(sortByCode);
 }
@@ -120,16 +115,4 @@ export function mapReservationRow(r: unknown): ReservationRow {
   };
 }
 
-const PARK_LNG_MIN = -73.9020;
-const PARK_LNG_MAX = -73.8720;
-const PARK_LAT_MIN = 40.8830;
-const PARK_LAT_MAX = 40.9120;
-
-function pctToLng(pct: number): number {
-  return PARK_LNG_MIN + (pct / 100) * (PARK_LNG_MAX - PARK_LNG_MIN);
-}
-
-function pctToLat(pct: number): number {
-  return PARK_LAT_MAX - (pct / 100) * (PARK_LAT_MAX - PARK_LAT_MIN);
-}
 

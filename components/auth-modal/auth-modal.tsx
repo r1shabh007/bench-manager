@@ -17,7 +17,7 @@ interface AuthModalProps {
   tab: AuthTab;
   onTabChange: (tab: AuthTab) => void;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess: (info: { isAdmin: boolean }) => void;
 }
 
 export function AuthModal({
@@ -144,7 +144,7 @@ function Field({
   );
 }
 
-function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+function LoginForm({ onSuccess }: { onSuccess: (info: { isAdmin: boolean }) => void }) {
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
@@ -157,7 +157,7 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     const res = await loginWithUsername(username, password);
     setLoading(false);
     if (res.ok) {
-      onSuccess();
+      onSuccess({ isAdmin: res.isAdmin ?? false });
     } else {
       setError(res.error ?? "Invalid username or password");
     }
@@ -196,9 +196,11 @@ function SignupForm({
   onAwaitingConfirm,
 }: {
   open: boolean;
-  onSuccess: () => void;
+  onSuccess: (info: { isAdmin: boolean }) => void;
   onAwaitingConfirm: () => void;
 }) {
+  const [firstName, setFirstName] = React.useState("");
+  const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -241,14 +243,14 @@ function SignupForm({
       return;
     }
     setLoading(true);
-    const res = await signUpWithUsername(email, username, password);
+    const res = await signUpWithUsername(email, username, password, firstName, lastName);
     setLoading(false);
     if (res.ok) {
       if (res.needsConfirmation) {
         onAwaitingConfirm();
         return;
       }
-      onSuccess();
+      onSuccess({ isAdmin: false });
     } else {
       setError(res.error ?? "Could not create your account.");
     }
@@ -256,6 +258,26 @@ function SignupForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="First name">
+          <Input
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            autoComplete="given-name"
+            className="h-11 bg-park-surface"
+            required
+          />
+        </Field>
+        <Field label="Last name">
+          <Input
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            autoComplete="family-name"
+            className="h-11 bg-park-surface"
+            required
+          />
+        </Field>
+      </div>
       <Field label="Email">
         <Input
           type="email"

@@ -7,13 +7,14 @@ import { useAuthModal } from "@/components/auth-modal/auth-modal-provider";
 import { logout } from "@/app/actions/auth";
 import { cn } from "@/lib/utils";
 import type { SessionUser } from "@/lib/types";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 
 export function Nav({ user }: { user: SessionUser | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const { open } = useAuthModal();
   const [loggingOut, setLoggingOut] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -54,17 +55,32 @@ export function Nav({ user }: { user: SessionUser | null }) {
           {links.map((l) => {
             const active =
               l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+            const needsAuth = !user && l.href === "/account";
+            const cls = cn(
+              "text-sm transition-colors",
+              active
+                ? "font-bold text-park-green underline underline-offset-4"
+                : "font-medium text-park-muted hover:text-park-green",
+            );
+            if (needsAuth) {
+              return (
+                <button
+                  key={l.href}
+                  onClick={() =>
+                    open({
+                      tab: "login",
+                      onSuccess: ({ isAdmin }) =>
+                        router.push(isAdmin ? "/admin" : "/account"),
+                    })
+                  }
+                  className={cls}
+                >
+                  {l.label}
+                </button>
+              );
+            }
             return (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={cn(
-                  "text-sm transition-colors",
-                  active
-                    ? "font-bold text-park-green underline underline-offset-4"
-                    : "font-medium text-park-muted hover:text-park-green",
-                )}
-              >
+              <Link key={l.href} href={l.href} className={cls}>
                 {l.label}
               </Link>
             );
@@ -73,8 +89,8 @@ export function Nav({ user }: { user: SessionUser | null }) {
 
         {user ? (
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm font-semibold text-park-green sm:inline">
-              {user.username}
+            <span className="hidden text-sm font-semibold text-park-ink sm:inline">
+              {user.firstName || user.username}
             </span>
             <button
               onClick={handleLogout}
@@ -87,12 +103,88 @@ export function Nav({ user }: { user: SessionUser | null }) {
           </div>
         ) : (
           <button
-            onClick={() => open({ tab: "login" })}
+            onClick={() =>
+              open({
+                tab: "login",
+                onSuccess: ({ isAdmin }) =>
+                  router.push(isAdmin ? "/admin" : "/account"),
+              })
+            }
             className="inline-flex h-11 items-center justify-center rounded-full bg-park-green px-5 text-sm font-bold text-white transition-colors hover:bg-park-green/90"
           >
-            Login / Sign Up
+            <span className="sm:hidden">Login</span>
+            <span className="hidden sm:inline">Login / Sign Up</span>
           </button>
         )}
+
+        {/* Mobile menu button */}
+        <div className="relative sm:hidden">
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className="inline-flex size-10 items-center justify-center rounded-lg text-park-green transition-colors hover:bg-park-sage/50"
+          >
+            {menuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-park-border bg-park-surface py-2 shadow-lg">
+              {links.map((l) => {
+                const active =
+                  l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
+                const needsAuth = !user && l.href === "/account";
+                if (needsAuth) {
+                  return (
+                    <button
+                      key={l.href}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        open({
+                          tab: "login",
+                          onSuccess: ({ isAdmin }) =>
+                            router.push(isAdmin ? "/admin" : "/account"),
+                        });
+                      }}
+                      className={cn(
+                        "block w-full px-4 py-2.5 text-left text-sm transition-colors",
+                        active
+                          ? "font-bold text-park-green"
+                          : "font-medium text-park-muted hover:bg-park-sage/40 hover:text-park-green",
+                      )}
+                    >
+                      {l.label}
+                    </button>
+                  );
+                }
+                return (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    onClick={() => setMenuOpen(false)}
+                    className={cn(
+                      "block px-4 py-2.5 text-sm transition-colors",
+                      active
+                        ? "font-bold text-park-green"
+                        : "font-medium text-park-muted hover:bg-park-sage/40 hover:text-park-green",
+                    )}
+                  >
+                    {l.label}
+                  </Link>
+                );
+              })}
+              {user && (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    handleLogout();
+                  }}
+                  disabled={loggingOut}
+                  className="block w-full border-t border-park-border px-4 py-2.5 text-left text-sm font-medium text-park-muted transition-colors hover:bg-park-sage/40 hover:text-park-green"
+                >
+                  Log out
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </nav>
     </header>
   );
