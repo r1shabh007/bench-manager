@@ -105,13 +105,13 @@ export default async function HomePage() {
         <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5">
             <h2 className="font-serif text-2xl text-park-green sm:text-3xl">
-              Find your place in the park
+              Current adoptions
             </h2>
             <p className="text-xs text-park-muted sm:text-sm">
-              Browse bench locations and availability across all regions
+              Hover over adopted benches to see who adopted them and their messages
             </p>
           </div>
-          <MapLegend />
+          <MapLegend adopted />
         </div>
         <div className="overflow-hidden rounded-2xl border border-park-border/60 shadow-sm">
           <ReservationProvider init={{ benches, booked }}>

@@ -163,10 +163,19 @@ export function createReservationStore(init: ReservationInit) {
           }
         }
       }
+      // Adoption must start at the earliest available year for this bench
+      let mustStart = state.currentYear;
+      for (const y of state.windowYearList) {
+        if (!unavailableYears.has(y)) {
+          mustStart = y;
+          break;
+        }
+      }
       const result = nextYearSelection(
         state.selectedYears,
         clickedYear,
         unavailableYears,
+        mustStart,
       );
       const newMin = result.years.length * PRICE_PER_YEAR;
       set({

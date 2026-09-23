@@ -46,7 +46,7 @@ export async function getBookedMonths(): Promise<
   const supabase = await createClient();
   const year = currentYearNY();
   const start = `${year}-01-01`;
-  const end = `${monthKey(year + 14, 12)}-01`;
+  const end = `${monthKey(2040, 12)}-01`;
   const { data, error } = await supabase
     .from("reservation_months")
     .select("bench_id, month")

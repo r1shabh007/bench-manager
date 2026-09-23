@@ -73,8 +73,9 @@ export function currentYearNY(now: Date = new Date()): number {
  * (15 calendar years total), to support up to 10-year adoptions.
  */
 export function windowMonths(currentYear: number): Month[] {
+  const end = 2040;
   const months: Month[] = [];
-  for (let y = currentYear; y < currentYear + 15; y++) {
+  for (let y = currentYear; y <= end; y++) {
     for (let mo = 1; mo <= 12; mo++) {
       months.push(monthKey(y, mo));
     }
@@ -82,9 +83,12 @@ export function windowMonths(currentYear: number): Month[] {
   return months;
 }
 
-/** The years shown in the adoption picker (current year + 14 more). */
+/** The years shown in the adoption picker (current year through 2040). */
 export function windowYears(currentYear: number): number[] {
-  return Array.from({ length: 15 }, (_, i) => currentYear + i);
+  const end = 2040;
+  const count = end - currentYear + 1;
+  if (count <= 0) return [currentYear];
+  return Array.from({ length: count }, (_, i) => currentYear + i);
 }
 
 /** All 12 months of a given year. */

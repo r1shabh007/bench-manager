@@ -1292,7 +1292,7 @@ function ReservationManagement({
           className="h-9 w-full bg-park-bg/50 sm:w-40"
         />
       </div>
-      <div className="min-h-[320px] max-h-[320px] overflow-auto rounded-xl border border-park-border">
+      <div className="min-h-[320px] max-h-[540px] overflow-auto rounded-xl border border-park-border">
         {filtered.length === 0 ? (
           <p className="p-4 text-sm text-park-muted">No adoptions found.</p>
         ) : (
@@ -1497,12 +1497,22 @@ function CreateReservationPanel({
     [year],
   );
 
+  const PLAQUE_MAX_LINE = 26;
+  const PLAQUE_MAX_LINES = 3;
+  const PLAQUE_MAX_CHARS = PLAQUE_MAX_LINE * PLAQUE_MAX_LINES;
+
+  function enforcePlaque(value: string): string {
+    const lines = value.split("\n").slice(0, PLAQUE_MAX_LINES);
+    return lines.map((l) => l.slice(0, PLAQUE_MAX_LINE)).join("\n");
+  }
+
   const [userQ, setUserQ] = React.useState("");
   const [userId, setUserId] = React.useState("");
   const [benchQ, setBenchQ] = React.useState("");
   const [benchId, setBenchId] = React.useState("");
   const [startYear, setStartYear] = React.useState(yearOptions[0]);
   const [endYear, setEndYear] = React.useState(yearOptions[0]);
+  const [plaqueMessage, setPlaqueMessage] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
 
   const userMatches = userQ
@@ -1542,6 +1552,7 @@ function CreateReservationPanel({
       benchId,
       startMonth: monthKey(startYear, 1),
       endMonth: monthKey(endYear, 12),
+      plaqueMessage: plaqueMessage.trim() || undefined,
     });
     setSubmitting(false);
     if (res.ok) {
@@ -1550,6 +1561,7 @@ function CreateReservationPanel({
       setUserQ("");
       setBenchId("");
       setBenchQ("");
+      setPlaqueMessage("");
       router.refresh();
     } else {
       toast.error(res.error ?? "Could not create adoption.");
@@ -1638,6 +1650,46 @@ function CreateReservationPanel({
             : "Choose a start and end year."}
           {!validRange && count > 10 && " — max is 10 years."}
         </p>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-semibold text-park-ink">
+            Plaque message <span className="font-normal text-park-muted">(optional)</span>
+          </span>
+          <div
+            className="rounded-lg p-[4px]"
+            style={{
+              background:
+                "linear-gradient(145deg, #c9a84c, #a67c32 30%, #c9a84c 50%, #a67c32 70%, #c9a84c)",
+            }}
+          >
+            <div
+              className="rounded-[3px] border-2 p-3"
+              style={{
+                background:
+                  "linear-gradient(160deg, #b8942d, #d4af37 25%, #c9a84c 50%, #b8942d 75%, #d4af37)",
+                borderColor: "#8a6914",
+              }}
+            >
+              <textarea
+                value={plaqueMessage}
+                onChange={(e) => setPlaqueMessage(enforcePlaque(e.target.value))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const lines = (e.currentTarget.value.match(/\n/g) || []).length;
+                    if (lines >= PLAQUE_MAX_LINES - 1) e.preventDefault();
+                  }
+                }}
+                placeholder="In loving memory of..."
+                rows={3}
+                className="w-full resize-none bg-transparent text-center font-serif text-xs leading-relaxed outline-none placeholder:opacity-50"
+                style={{ color: "#3d2e0a" }}
+              />
+            </div>
+          </div>
+          <p className="text-right text-[11px] text-park-muted">
+            {plaqueMessage.length}/{PLAQUE_MAX_CHARS} &middot; {PLAQUE_MAX_LINE} per line
+          </p>
+        </div>
 
         <button
           type="submit"

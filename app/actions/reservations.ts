@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionUser } from "@/lib/auth";
-import { currentMonthNY } from "@/lib/months";
+import { currentMonthNY, currentYearNY } from "@/lib/months";
 
 export interface ReserveResult {
   ok: boolean;
@@ -45,6 +45,11 @@ export async function createReservationAction(input: {
     }
   }
   const curMonth = currentMonthNY();
+  const curYear = currentYearNY();
+  const startYear = parseInt(input.startMonth.slice(0, 4), 10);
+  if (startYear < curYear || startYear > 2040) {
+    return { ok: false, error: "Invalid adoption start year." };
+  }
   const startMonth = input.startMonth < curMonth ? curMonth : input.startMonth;
 
   const { data, error } = await supabase.rpc("create_reservation", {

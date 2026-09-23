@@ -111,7 +111,8 @@ export function BenchMap({ readOnly = false, adoptions }: { readOnly?: boolean; 
         const existing = markers.get(bench.id);
 
         if (existing) {
-          updateMarkerColor(existing, dotState, bench);
+          const isAdopted = adoptions ? bench.id in adoptions : false;
+          updateMarkerColor(existing, dotState, bench, isAdopted);
           existing.setLatLng([bench.latitude, bench.longitude]);
         } else {
           const isAdopted = adoptions ? bench.id in adoptions : false;
@@ -138,7 +139,8 @@ export function BenchMap({ readOnly = false, adoptions }: { readOnly?: boolean; 
     for (const bench of visible) {
       const marker = markers.get(bench.id);
       if (marker) {
-        updateMarkerColor(marker, benchDot(state, bench.id), bench);
+        const isAdopted = adoptions ? bench.id in adoptions : false;
+        updateMarkerColor(marker, benchDot(state, bench.id), bench, isAdopted);
       }
     }
   });
@@ -192,9 +194,9 @@ function createBenchMarker(
 
   let tooltipContent = bench.code;
   if (isAdopted && plaqueMessage) {
-    tooltipContent = `<strong>${bench.code}</strong> <span style="color:#2d6a4f;font-size:10px">Adopted</span><br/><span style="font-style:italic;font-size:11px;white-space:pre-line">${plaqueMessage.replace(/</g, "&lt;")}</span>`;
+    tooltipContent = `<div style="white-space:nowrap;text-align:center"><strong>${bench.code}</strong> <span style="color:#2d6a4f;font-size:10px">Adopted</span></div><div style="font-style:italic;font-size:11px;white-space:pre;text-align:center">${plaqueMessage.replace(/</g, "&lt;")}</div>`;
   } else if (isAdopted) {
-    tooltipContent = `<strong>${bench.code}</strong> <span style="color:#2d6a4f;font-size:10px">Adopted</span>`;
+    tooltipContent = `<div style="white-space:nowrap;text-align:center"><strong>${bench.code}</strong> <span style="color:#2d6a4f;font-size:10px">Adopted</span></div>`;
   }
 
   marker.bindTooltip(tooltipContent, {
@@ -206,11 +208,11 @@ function createBenchMarker(
   return marker;
 }
 
-function updateMarkerColor(marker: any, state: DotState, bench: Bench) {
+function updateMarkerColor(marker: any, state: DotState, bench: Bench, isAdopted = false) {
   marker.setZIndexOffset(DOT_Z[state]);
   const el = marker.getElement()?.querySelector(".bench-dot") as HTMLElement | null;
   if (!el) return;
-  el.style.background = DOT_COLORS[state];
+  el.style.background = isAdopted && state !== "selected" ? DOT_COLORS.adopted : DOT_COLORS[state];
   el.style.boxShadow =
     state === "selected"
       ? "0 0 0 3px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.3)"

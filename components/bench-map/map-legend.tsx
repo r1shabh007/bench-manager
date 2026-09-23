@@ -1,9 +1,13 @@
-export function MapLegend() {
+export function MapLegend({ adopted }: { adopted?: boolean } = {}) {
   return (
     <div className="flex flex-wrap items-center gap-4 text-xs text-park-muted">
       <LegendItem className="bg-bench-available" label="Available" />
       <LegendItem className="bg-bench-unavailable" label="Unavailable" />
-      <LegendItem className="bg-bench-selected" label="Selected" />
+      {adopted ? (
+        <LegendItem className="bg-[#2d6a4f]" label="Adopted" />
+      ) : (
+        <LegendItem className="bg-bench-selected" label="Selected" />
+      )}
     </div>
   );
 }

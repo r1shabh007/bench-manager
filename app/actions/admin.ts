@@ -29,18 +29,29 @@ export async function adminCreateReservation(input: {
   benchId: string;
   startMonth: string;
   endMonth: string;
+  plaqueMessage?: string;
 }): Promise<AdminResult> {
   await requireAdmin();
   const supabase = await createClient();
-  const { error } = await supabase.rpc("create_reservation", {
+  const { data, error } = await supabase.rpc("create_reservation", {
     p_user_id: input.userId,
     p_bench_id: input.benchId,
     p_start: `${input.startMonth}-01`,
     p_end: `${input.endMonth}-01`,
   });
   if (error) return { ok: false, error: friendlyError(error.message) };
+
+  if (input.plaqueMessage) {
+    const reservationId = data as string;
+    await supabase
+      .from("reservations")
+      .update({ plaque_message: input.plaqueMessage })
+      .eq("id", reservationId);
+  }
+
   revalidatePath("/admin");
   revalidatePath("/reservation");
+  revalidatePath("/");
   return { ok: true };
 }
 
