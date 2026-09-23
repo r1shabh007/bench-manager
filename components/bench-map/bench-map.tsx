@@ -43,9 +43,9 @@ export function BenchMap({ readOnly = false, adoptions }: { readOnly?: boolean; 
 
   const store = useReservationApi();
   const visible = useReservationStore(selectVisibleBenches);
-  useReservationStore((s) => s.selectedBenchId);
-  useReservationStore((s) => s.selectedYears);
-  useReservationStore((s) => s.bookedByBench);
+  const selectedBenchId = useReservationStore((s) => s.selectedBenchId);
+  const selectedYears = useReservationStore((s) => s.selectedYears);
+  const bookedByBench = useReservationStore((s) => s.bookedByBench);
 
   React.useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -65,12 +65,21 @@ export function BenchMap({ readOnly = false, adoptions }: { readOnly?: boolean; 
           maxZoom: 22,
           maxBounds: L.latLngBounds(BOUNDS_SW, BOUNDS_NE),
           maxBoundsViscosity: 1.0,
+          // Don't let the map swallow the mouse wheel while the page scrolls past it.
+          scrollWheelZoom: false,
         });
 
         L.tileLayer(TILE_URL, {
           attribution: ATTRIBUTION,
           maxZoom: 22,
         }).addTo(map);
+
+        if (!readOnly) {
+          // On the interactive map, enable wheel-zoom only once the user commits
+          // to the map by clicking it, and release it when the cursor leaves.
+          map.on("click", () => map.scrollWheelZoom.enable());
+          map.on("mouseout", () => map.scrollWheelZoom.disable());
+        }
 
         mapRef.current = map;
         setReady(true);
@@ -143,7 +152,7 @@ export function BenchMap({ readOnly = false, adoptions }: { readOnly?: boolean; 
         updateMarkerColor(marker, benchDot(state, bench.id), bench, isAdopted);
       }
     }
-  });
+  }, [ready, store, visible, adoptions, selectedBenchId, selectedYears, bookedByBench]);
 
   return (
     <>
